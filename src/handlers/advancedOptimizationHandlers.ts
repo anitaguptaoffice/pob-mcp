@@ -155,7 +155,16 @@ export async function handleOptimizeSkillLinks(
     // Try Lua client first for accurate data
     const luaClient = context.getLuaClient();
 
-    if (luaClient && !buildName) {
+    if (luaClient) {
+      // Load build if buildName provided
+      if (buildName) {
+        const fs2 = await import('fs/promises');
+        const path2 = await import('path');
+        const buildPath = path2.join(context.pobDirectory, buildName);
+        const xml = await fs2.readFile(buildPath, 'utf-8');
+        await luaClient.loadBuildXml(xml, buildName);
+      }
+
       try {
         const skillData = await luaClient.getSkills();
 
@@ -173,7 +182,7 @@ export async function handleOptimizeSkillLinks(
 
         // Get build type from tree/stats
         const tree = await luaClient.getTree();
-        const stats = await luaClient.getStats();
+        const stats = await luaClient.getStats(['TotalDPS', 'Life', 'EnergyShield']);
         const classNames = ['Scion', 'Marauder', 'Ranger', 'Witch', 'Duelist', 'Templar', 'Shadow'];
         const className = classNames[tree.classId];
 
@@ -183,7 +192,6 @@ export async function handleOptimizeSkillLinks(
           dps: stats.TotalDPS,
         });
       } catch (error) {
-        // Fall back to XML
         if (!buildName) {
           throw new Error(
             'No build loaded in Lua client and no build_name provided. Load a build first or provide build_name.'
@@ -262,22 +270,44 @@ export async function handleOptimizeSkillLinks(
  */
 export async function handleCreateBudgetBuild(
   context: AdvancedOptimizationContext,
-  requirements: {
-    class_name: string;
-    ascendancy?: string;
-    main_skill: string;
-    budget_level: 'low' | 'medium' | 'high';
-    focus?: 'offense' | 'defense' | 'balanced';
-  }
+  buildName: string,
+  budgetTier: string = 'league-start'
 ) {
   try {
-    const { class_name, ascendancy, main_skill, budget_level, focus = 'balanced' } = requirements;
+    // Map budget tier to internal level
+    const budgetTierMap: Record<string, 'low' | 'medium' | 'high'> = {
+      'league-start': 'low',
+      'low': 'low',
+      'medium': 'medium',
+      'endgame': 'high',
+      'high': 'high',
+    };
+    const budget_level = budgetTierMap[budgetTier] || 'low';
 
-    let output = '=== Budget Build Planner ===\n\n';
+    // Read build info from XML
+    const build = await context.buildService.readBuild(buildName);
+    const class_name = build.Build?.className || 'Unknown';
+    const ascendancy = build.Build?.ascendClassName;
+
+    // Get main skill from first skill group
+    let main_skill = 'your main skill';
+    if (build.Skills?.SkillSet?.Skill) {
+      const skills = Array.isArray(build.Skills.SkillSet.Skill)
+        ? build.Skills.SkillSet.Skill
+        : [build.Skills.SkillSet.Skill];
+      const firstSkill = skills[0];
+      if (firstSkill?.Gem) {
+        const gems = Array.isArray(firstSkill.Gem) ? firstSkill.Gem : [firstSkill.Gem];
+        const activeGem = gems.find((g: any) => g.enabled !== 'false' && !g.name?.includes('Support'));
+        if (activeGem?.name) main_skill = activeGem.name;
+      }
+    }
+
+    let output = '=== Budget Build Guide ===\n\n';
+    output += `Build: ${buildName}\n`;
     output += `Class: ${class_name}${ascendancy ? ` (${ascendancy})` : ''}\n`;
     output += `Main Skill: ${main_skill}\n`;
-    output += `Budget Level: ${budget_level}\n`;
-    output += `Focus: ${focus}\n\n`;
+    output += `Budget Tier: ${budgetTier}\n\n`;
 
     // Budget definitions
     output += '=== Budget Guidelines ===\n';
@@ -314,16 +344,11 @@ export async function handleCreateBudgetBuild(
 
     // Defensive layers
     output += '=== Defensive Layers ===\n';
-    if (focus === 'defense' || focus === 'balanced') {
-      output += '- Aim for 75% all elemental resistances (MANDATORY)\n';
-      output += '- Target 4000+ life for softcore, 5000+ for hardcore\n';
-      output += '- Use defensive auras (Determination, Grace, or Defiance Banner)\n';
-      output += '- Get spell suppression if on right side of tree (Ranger/Shadow)\n';
-      output += '- Consider block/evasion/armour based on class\n';
-    } else {
-      output += '- Minimum 3500 life and capped resistances\n';
-      output += '- One defensive layer (block, evasion, or armour)\n';
-    }
+    output += '- Aim for 75% all elemental resistances (MANDATORY)\n';
+    output += '- Target 4000+ life for softcore, 5000+ for hardcore\n';
+    output += '- Use defensive auras (Determination, Grace, or Defiance Banner)\n';
+    output += '- Get spell suppression if on right side of tree (Ranger/Shadow)\n';
+    output += '- Consider block/evasion/armour based on class\n';
     output += '\n';
 
     // Gearing strategy

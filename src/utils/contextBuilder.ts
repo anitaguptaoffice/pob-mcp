@@ -101,6 +101,7 @@ export interface AdvancedOptimizationContext {
 export interface ValidationContext {
   buildService: BuildService;
   validationService: ValidationService;
+  pobDirectory: string;
   getLuaClient: () => PoBLuaApiClient | PoBLuaTcpClient | null;
   ensureLuaClient: () => Promise<void>;
 }
@@ -248,6 +249,7 @@ export class ContextBuilder {
     return {
       buildService: this.deps.buildService,
       validationService: this.deps.validationService,
+      pobDirectory: this.deps.pobDirectory,
       getLuaClient: this.deps.getLuaClient,
       ensureLuaClient: this.deps.ensureLuaClient,
     };

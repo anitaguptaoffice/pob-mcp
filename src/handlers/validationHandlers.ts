@@ -1,10 +1,13 @@
 import type { BuildService } from "../services/buildService.js";
 import type { ValidationService } from "../services/validationService.js";
 import type { PoBLuaApiClient, PoBLuaTcpClient } from "../pobLuaBridge.js";
+import fs from "fs/promises";
+import path from "path";
 
 export interface ValidationHandlerContext {
   buildService: BuildService;
   validationService: ValidationService;
+  pobDirectory?: string;
   getLuaClient?: () => PoBLuaApiClient | PoBLuaTcpClient | null;
   ensureLuaClient?: () => Promise<void>;
 }
@@ -22,16 +25,18 @@ export async function handleValidateBuild(
   let luaStats;
   const buildName = args?.build_name;
 
-  // Try to use Lua bridge for accurate stats if a build is already loaded
-  if (getLuaClient && buildName) {
+  // Load build into Lua bridge for accurate stats
+  if (getLuaClient && buildName && context.pobDirectory) {
     const luaClient = getLuaClient();
 
     if (luaClient) {
       try {
+        const buildPath = path.join(context.pobDirectory, buildName);
+        const buildXml = await fs.readFile(buildPath, 'utf-8');
+        await luaClient.loadBuildXml(buildXml, buildName);
         luaStats = await luaClient.getStats();
       } catch (error) {
         // Lua stats failed, will fall back to XML
-        console.error('[Validation] Failed to get Lua stats:', error);
       }
     }
   }

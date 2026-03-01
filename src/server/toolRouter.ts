@@ -331,13 +331,8 @@ export async function routeToolCall(
       const budgetBuildContext = deps.contextBuilder.buildAdvancedOptimizationContext();
       return await handleCreateBudgetBuild(
         budgetBuildContext,
-        {
-          class_name: args.class_name as string,
-          ascendancy: args.ascendancy as string | undefined,
-          main_skill: args.main_skill as string,
-          budget_level: args.budget_level as 'low' | 'medium' | 'high',
-          focus: args.focus as 'offense' | 'defense' | 'balanced' | undefined,
-        }
+        args.build_name as string,
+        (args.budget_tier || 'league-start') as string
       );
 
     // Phase 7: Build Validation
