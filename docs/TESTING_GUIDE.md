@@ -41,7 +41,7 @@ This guide provides comprehensive test cases for all features of the Path of Bui
       "env": {
         "POB_DIRECTORY": "/path/to/your/Path of Building/Builds",
         "POB_LUA_ENABLED": "true",
-        "POB_FORK_PATH": "/path/to/pob-api-fork/src",
+        "POB_FORK_PATH": "/path/to/PathOfBuilding/src",
         "POB_CMD": "luajit",
         "POB_TIMEOUT_MS": "10000"
       }

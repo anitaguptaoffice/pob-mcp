@@ -10,7 +10,7 @@ POB_DIRECTORY="/path/to/Path of Building/Builds"
 ### Lua Bridge (Optional)
 ```bash
 POB_LUA_ENABLED="true"                              # Enable Lua bridge
-POB_FORK_PATH="/path/to/pob-api-fork/src"         # PoB API fork location
+POB_FORK_PATH="/path/to/PathOfBuilding/src"        # Path of Building src location
 POB_CMD="luajit"                                    # LuaJIT command
 POB_TIMEOUT_MS="10000"                              # Request timeout (10s)
 ```
@@ -420,7 +420,7 @@ Use these when asking for build planning help:
 
 ### Enable Lua Bridge (Optional)
 - [ ] Install LuaJIT
-- [ ] Clone pob-api-fork
+- [ ] Clone PathOfBuilding (api-stdio branch)
 - [ ] Add POB_LUA_ENABLED=true to config
 - [ ] Add POB_FORK_PATH to config
 - [ ] Restart Claude Desktop

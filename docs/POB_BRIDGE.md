@@ -4,7 +4,7 @@ This document outlines how we will integrate the forked Path of Building (PoB) h
 
 ## Overview
 - Goal: Use the forked PoB headless API to load builds, compute stats, and edit passive trees from MCP tools.
-- Fork location: `~/Projects/pob-api-fork` (API server runs from `~/Projects/pob-api-fork/src`).
+- Fork location: `~/Projects/PathOfBuilding` (API server runs from `~/Projects/PathOfBuilding/src`).
 - Transport: stdio JSON lines (one line per request/response), long‑lived process. Optional TCP (embedded in GUI) on 127.0.0.1:POB_API_TCP_PORT.
 - Bridge: `src/pobLuaBridge.ts` spawns and talks to the PoB API.
 - Rollout: Feature‑flagged; graceful fallback to current XML‑only analysis if headless is unavailable.
@@ -14,7 +14,7 @@ This document outlines how we will integrate the forked Path of Building (PoB) h
   - Start: On first “lua_*” tool call (or explicit `lua_start`).
   - Stop: On MCP shutdown (or explicit `lua_stop`).
 - Node bridge (already added): `src/pobLuaBridge.ts`
-  - Spawns `luajit HeadlessWrapper.lua` in `~/Projects/pob-api-fork/src` with `POB_API_STDIO=1`.
+  - Spawns `luajit HeadlessWrapper.lua` in `~/Projects/PathOfBuilding/src` with `POB_API_STDIO=1`.
   - Methods: `start()`, `stop()`, `ping()`, `loadBuildXml()`, `getStats()`, `getTree()`, `setTree()`.
 - Fork API (implemented): `load_build_xml`, `get_stats`, `get_tree`, `set_tree`, `quit`.
 
@@ -194,14 +194,14 @@ Notes
 4. Add configuration
    - Env vars (with defaults):
      - `POB_LUA_ENABLED` (default: false)
-     - `POB_FORK_PATH` (default: `~/Projects/pob-api-fork/src`)
+     - `POB_FORK_PATH` (default: `~/Projects/PathOfBuilding/src`)
      - `POB_CMD` (default: `luajit`)
      - `POB_ARGS` (default: `HeadlessWrapper.lua`)
      - `POB_TIMEOUT_MS` (default: `10000`)
 
 5. Update docs
    - README: add “Headless PoB Integration” section with prerequisites and usage.
-   - API_README link: refer to `~/Projects/pob-api-fork/API_README.md` for fork usage.
+   - API_README link: refer to `~/Projects/PathOfBuilding/src/API/` for API usage.
 
 ## Error Handling & Fallbacks
 - Startup failure (binary missing, bad path):
@@ -244,7 +244,7 @@ Notes
 
 ## Prerequisites
 - `luajit` in PATH (`brew install luajit` on macOS).
-- PoB fork present at `~/Projects/pob-api-fork` (with the headless API scaffold).
+- PathOfBuilding present at `~/Projects/PathOfBuilding` (with the headless API scaffold in `src/API/`).
 - Set `POB_LUA_ENABLED=true` to expose the new tools.
 
 

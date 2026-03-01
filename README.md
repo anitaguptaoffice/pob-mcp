@@ -131,7 +131,7 @@ Add this to your Claude Desktop configuration file:
       "env": {
         "POB_DIRECTORY": "/path/to/your/Path of Building/Builds",
         "POB_LUA_ENABLED": "true",
-        "POB_FORK_PATH": "/path/to/pob-api-fork/src",
+        "POB_FORK_PATH": "/path/to/PathOfBuilding/src",
         "POB_CMD": "luajit",
         "POB_TIMEOUT_MS": "10000"
       }
@@ -147,7 +147,7 @@ Add this to your Claude Desktop configuration file:
 - `POB_LUA_ENABLED`: Set to `"true"` to enable Lua bridge features (default: `"false"`)
 
 #### Lua Bridge Settings (when POB_LUA_ENABLED=true)
-- `POB_FORK_PATH`: Path to pob-api-fork/src directory (default: `~/Projects/pob-api-fork/src`)
+- `POB_FORK_PATH`: Path to PathOfBuilding/src directory (default: `~/Projects/PathOfBuilding/src`)
 - `POB_CMD`: LuaJIT command (default: `"luajit"`)
 - `POB_ARGS`: Lua script to run (default: `"HeadlessWrapper.lua"`)
 - `POB_TIMEOUT_MS`: Request timeout in milliseconds (default: `"10000"`)
@@ -174,12 +174,12 @@ The Lua bridge enables high-fidelity stat calculations using PoB's actual calcul
    # Download from https://luajit.org/ and add to PATH
    ```
 
-2. **Clone PoB API Fork**:
+2. **Clone PathOfBuilding**:
    ```bash
-   git clone [git@github.com:ianderse/PathOfBuilding.git]
-   checkout branch api-stdio
+   git clone git@github.com:ianderse/PathOfBuilding.git
+   cd PathOfBuilding
+   git checkout api-stdio
    # Note the path to the 'src' directory for POB_FORK_PATH
-   # Note that if this is eventually merged into Path Of Building official repo, you will not need this step
    ```
 
 3. **Verify Installation**:
