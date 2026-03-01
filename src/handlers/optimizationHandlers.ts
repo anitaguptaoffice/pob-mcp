@@ -144,10 +144,52 @@ export async function handleSuggestOptimalNodes(
 
     const points = pointsAvailable || 10;
 
-    // Map goal to search keywords
+    // Detect build archetype from active skills to improve relevance
+    let buildKeywords: string[] = [];
+    try {
+      const skills = await luaClient.getSkills();
+      const allGemNames: string[] = [];
+      if (skills && skills.socketGroups) {
+        for (const group of skills.socketGroups) {
+          for (const gem of (group.gems || [])) {
+            if (gem.name) allGemNames.push(gem.name.toLowerCase());
+          }
+        }
+      }
+      const gemText = allGemNames.join(' ');
+      // Detect archetypes from gem names and inject relevant keywords
+      if (gemText.includes('minion') || gemText.includes('summon') || gemText.includes('golem') || gemText.includes('skeleton') || gemText.includes('zombie')) {
+        buildKeywords.push('minion');
+      }
+      if (gemText.includes('lightning') || gemText.includes('thunder') || gemText.includes('storm') || gemText.includes('arc ')) {
+        buildKeywords.push('lightning');
+      }
+      if (gemText.includes('fire') || gemText.includes('flame') || gemText.includes('ignite') || gemText.includes('burning')) {
+        buildKeywords.push('fire');
+      }
+      if (gemText.includes('cold') || gemText.includes('ice') || gemText.includes('freeze') || gemText.includes('frost')) {
+        buildKeywords.push('cold');
+      }
+      if (gemText.includes('chaos') || gemText.includes('poison') || gemText.includes('blight')) {
+        buildKeywords.push('chaos');
+      }
+      if (gemText.includes('spell') || gemText.includes('arcane') || gemText.includes('cast')) {
+        buildKeywords.push('spell');
+      }
+      if (!gemText.includes('summon') && !gemText.includes('minion') &&
+          (gemText.includes('strike') || gemText.includes('slash') || gemText.includes('attack'))) {
+        buildKeywords.push('attack');
+      }
+    } catch {}
+
+    // Map goal to search keywords, prioritising build archetype
     const goalKeywords: Record<string, string[]> = {
-      damage: ['damage', 'critical', 'attack', 'spell', 'elemental'],
-      dps: ['damage', 'critical', 'attack', 'cast speed'],
+      damage: buildKeywords.length > 0
+        ? [...buildKeywords.map(k => `${k} damage`), 'damage', 'critical']
+        : ['damage', 'critical', 'elemental', 'spell'],
+      dps: buildKeywords.length > 0
+        ? [...buildKeywords, 'cast speed', 'critical']
+        : ['damage', 'critical', 'cast speed'],
       defense: ['life', 'armour', 'evasion', 'block', 'energy shield'],
       life: ['life', 'maximum life', 'life regeneration'],
       es: ['energy shield', 'maximum energy shield'],
@@ -156,11 +198,11 @@ export async function handleSuggestOptimalNodes(
     };
 
     const goal = goalString.toLowerCase();
-    const keywords = goalKeywords[goal] || [goal];
+    const keywords = goalKeywords[goal] || (buildKeywords.length > 0 ? [...buildKeywords, goal] : [goal]);
 
     // Search for relevant notable/keystone nodes
     let allNodes: any[] = [];
-    for (const keyword of keywords.slice(0, 2)) {
+    for (const keyword of keywords.slice(0, 3)) {
       try {
         const results = await luaClient.searchNodes({
           keyword,

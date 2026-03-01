@@ -593,8 +593,9 @@ export class TreeService {
       const currentNode = treeData.nodes.get(currentNodeId);
       if (!currentNode) continue;
 
-      // Check all neighbors
-      for (const neighborId of currentNode.out || []) {
+      // Check all neighbors (bidirectional — PoB tree edges are traversable both ways)
+      const neighbors = [...(currentNode.out || []), ...(currentNode.in || [])];
+      for (const neighborId of neighbors) {
         if (!unvisited.has(neighborId)) continue;
 
         const newDistance = minDistance + 1;

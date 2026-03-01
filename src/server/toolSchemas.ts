@@ -293,6 +293,20 @@ export function getLuaToolSchemas(): any[] {
       },
     },
     {
+      name: "set_character_level",
+      description: "Set the character level for the currently loaded build. Recalculates all stats.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          level: {
+            type: "number",
+            description: "Character level (1-100)",
+          },
+        },
+        required: ["level"],
+      },
+    },
+    {
       name: "lua_get_stats",
       description: "Get comprehensive calculated stats from the currently loaded build (requires lua_load_build first)",
       inputSchema: {

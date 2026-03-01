@@ -178,6 +178,23 @@ export async function routeToolCall(
         args.name as string | undefined
       );
 
+    case "set_character_level": {
+      if (!args) throw new Error("Missing arguments");
+      const level = args.level as number;
+      if (!level || level < 1 || level > 100) throw new Error("level must be between 1 and 100");
+      await deps.ensureLuaClient();
+      const luaClient = deps.getLuaClient();
+      if (!luaClient) throw new Error("Lua bridge not active. Use lua_start first.");
+      await luaClient.setLevel(level);
+      const stats = await luaClient.getStats(['Life', 'EnergyShield', 'Mana', 'ManaUnreserved']);
+      return {
+        content: [{
+          type: "text" as const,
+          text: `✅ Character level set to ${level}.\n\nUpdated stats:\n  Life: ${stats.Life ?? '-'}  |  ES: ${stats.EnergyShield ?? '-'}  |  Mana: ${stats.Mana ?? '-'}  |  Mana Unreserved: ${stats.ManaUnreserved ?? '-'}`,
+        }],
+      };
+    }
+
     case "lua_get_stats":
       return await handleLuaGetStats(luaContext, args?.category as string | undefined);
 
@@ -255,7 +272,7 @@ export async function routeToolCall(
 
     case "set_main_skill":
       if (!args) throw new Error("Missing arguments");
-      return await handleSetMainSkill(itemSkillContext, args.socket_group as number, args.active_skill_index as number | undefined, args.skill_part as number | undefined);
+      return await handleSetMainSkill(itemSkillContext, args.group_index as number, args.gem_index as number | undefined, args.skill_part as number | undefined);
 
     case "create_socket_group":
       return await handleCreateSocketGroup(itemSkillContext, args?.label as string | undefined, args?.slot as string | undefined, args?.enabled as boolean | undefined, args?.include_in_full_dps as boolean | undefined);

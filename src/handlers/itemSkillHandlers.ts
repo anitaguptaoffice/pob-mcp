@@ -113,6 +113,22 @@ export async function handleToggleFlask(
 
     let text = `✅ Flask ${flaskNumber} ${active ? 'activated' : 'deactivated'}.`;
 
+    // Return updated key defensive stats so the effect is visible immediately
+    try {
+      const stats = await luaClient.getStats([
+        'Life', 'Armour', 'Evasion', 'EnergyShield',
+        'FireResist', 'ColdResist', 'LightningResist', 'ChaosResist',
+        'PhysicalDamageReduction', 'ManaUnreserved',
+      ]);
+      const fmt = (v: any) => v != null ? String(v) : '-';
+      text += `\n\nUpdated stats:\n`;
+      text += `  Life: ${fmt(stats.Life)}  |  Armour: ${fmt(stats.Armour)}  |  Evasion: ${fmt(stats.Evasion)}\n`;
+      text += `  Fire: ${fmt(stats.FireResist)}%  Cold: ${fmt(stats.ColdResist)}%  Lightning: ${fmt(stats.LightningResist)}%  Chaos: ${fmt(stats.ChaosResist)}%\n`;
+      if (stats.PhysicalDamageReduction != null) {
+        text += `  PDR: ${fmt(stats.PhysicalDamageReduction)}%\n`;
+      }
+    } catch {}
+
     return {
       content: [
         {

@@ -26,6 +26,7 @@ export async function handleValidateBuild(
   const buildName = args?.build_name;
 
   // Try to get Lua bridge stats (works for both file-loaded and in-memory builds)
+  let luaFlaskImmunities: { bleed: boolean; freeze: boolean; poison: boolean; curse: boolean } | null = null;
   if (getLuaClient) {
     const luaClient = getLuaClient();
     if (luaClient) {
@@ -41,6 +42,25 @@ export async function handleValidateBuild(
           }
         }
         luaStats = await luaClient.getStats();
+
+        // Get flask immunities from Lua bridge (more reliable than XML slot parsing)
+        try {
+          const items = await (luaClient as any).getItems();
+          if (Array.isArray(items)) {
+            const flaskItems = items.filter((it: any) =>
+              it.slot && it.slot.startsWith('Flask') && it.raw
+            );
+            const allFlaskText = flaskItems.map((it: any) => (it.raw || '').toLowerCase()).join(' ');
+            luaFlaskImmunities = {
+              bleed: allFlaskText.includes('bleed') || allFlaskText.includes('corrupted blood'),
+              freeze: allFlaskText.includes('freeze') || allFlaskText.includes('chill'),
+              poison: allFlaskText.includes('poison'),
+              curse: allFlaskText.includes('curse'),
+            };
+          }
+        } catch {
+          // Flask immunity check via Lua unavailable — fall back to XML parsing
+        }
       } catch {
         // Lua stats unavailable
       }
@@ -69,7 +89,32 @@ export async function handleValidateBuild(
 
   if (buildData) {
     // Full XML-based validation
-    const flaskAnalysis = buildService.parseFlasks(buildData);
+    let flaskAnalysis = buildService.parseFlasks(buildData);
+    // Override flask immunities with Lua bridge data when available (more reliable)
+    if (luaFlaskImmunities && flaskAnalysis) {
+      flaskAnalysis = {
+        ...flaskAnalysis,
+        hasBleedImmunity: luaFlaskImmunities.bleed,
+        hasFreezeImmunity: luaFlaskImmunities.freeze,
+        hasPoisonImmunity: luaFlaskImmunities.poison,
+        hasCurseImmunity: luaFlaskImmunities.curse,
+      };
+    } else if (luaFlaskImmunities && !flaskAnalysis) {
+      // No XML flask data but we have Lua data — construct minimal analysis
+      flaskAnalysis = {
+        totalFlasks: 0,
+        activeFlasks: 0,
+        flasks: [],
+        flaskTypes: { life: 0, mana: 0, hybrid: 0, utility: 0 },
+        hasBleedImmunity: luaFlaskImmunities.bleed,
+        hasFreezeImmunity: luaFlaskImmunities.freeze,
+        hasPoisonImmunity: luaFlaskImmunities.poison,
+        hasCurseImmunity: luaFlaskImmunities.curse,
+        uniqueFlasks: [],
+        warnings: [],
+        recommendations: [],
+      };
+    }
     const validation = validationService.validateBuild(buildData, flaskAnalysis, luaStats);
     formattedOutput = validationService.formatValidation(validation);
   } else {
