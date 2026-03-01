@@ -130,10 +130,17 @@ export async function handleSuggestOptimalNodes(
     const luaClient = context.getLuaClient();
     if (!luaClient) throw new Error('Lua client not initialized');
 
-    // Load build if buildName provided
-    const buildPath = path.join(context.pobDirectory, buildName);
-    const buildXml = await fs.readFile(buildPath, 'utf-8');
-    await luaClient.loadBuildXml(buildXml, buildName);
+    // Load build from disk if buildName refers to an existing file, otherwise
+    // assume a build is already loaded in the Lua bridge (in-memory workflow)
+    if (buildName) {
+      const buildPath = path.join(context.pobDirectory, buildName);
+      try {
+        const buildXml = await fs.readFile(buildPath, 'utf-8');
+        await luaClient.loadBuildXml(buildXml, buildName);
+      } catch {
+        // Build file not found — use whichever build is currently loaded in Lua bridge
+      }
+    }
 
     const points = pointsAvailable || 10;
 
@@ -252,10 +259,16 @@ export async function handleOptimizeTree(
     const luaClient = context.getLuaClient();
     if (!luaClient) throw new Error('Lua client not initialized');
 
-    // Load the build
-    const buildPath = path.join(context.pobDirectory, buildName);
-    const buildXml = await fs.readFile(buildPath, 'utf-8');
-    await luaClient.loadBuildXml(buildXml, buildName);
+    // Load build from disk if it exists, otherwise use the currently loaded Lua build
+    if (buildName) {
+      const buildPath = path.join(context.pobDirectory, buildName);
+      try {
+        const buildXml = await fs.readFile(buildPath, 'utf-8');
+        await luaClient.loadBuildXml(buildXml, buildName);
+      } catch {
+        // Build file not found — use whichever build is currently loaded in Lua bridge
+      }
+    }
 
     const points = maxPoints || 10;
     const goal = (goalString || 'balanced').toLowerCase();

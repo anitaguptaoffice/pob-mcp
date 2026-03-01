@@ -218,15 +218,21 @@ export async function routeToolCall(
       if (!args) throw new Error("Missing arguments");
       return await handleLuaSetTree(luaContext, args);
 
-    case "search_tree_nodes":
+    case "search_tree_nodes": {
       if (!args) throw new Error("Missing arguments");
+      // Support both 'query' (schema name) and 'keyword' (legacy name)
+      const searchQuery = (args.query ?? args.keyword ?? args.q) as string | undefined;
+      if (!searchQuery || String(searchQuery).trim().length === 0) {
+        throw new Error(`search_tree_nodes requires a 'query' parameter (received args: ${JSON.stringify(Object.keys(args))})`);
+      }
       return await handleSearchTreeNodes(
         luaContext,
-        (args.query || args.keyword) as string,
+        String(searchQuery).trim(),
         args.node_type as string | undefined,
         (args.limit || args.max_results) as number | undefined,
         args.include_allocated as boolean | undefined
       );
+    }
 
     // Phase 4: Item & Skill tools
     case "add_item":
@@ -270,16 +276,25 @@ export async function routeToolCall(
       if (!args) throw new Error("Missing arguments");
       return await handleRemoveGem(itemSkillContext, args.group_index as number, args.gem_index as number);
 
-    case "setup_skill_with_gems":
+    case "setup_skill_with_gems": {
       if (!args) throw new Error("Missing arguments");
+      // Schema exposes active_gem (string) + support_gems (string[]), build the gems array here
+      const activeGemName = args.active_gem as string | undefined;
+      const supportGemNames = args.support_gems as string[] | undefined;
+      if (!activeGemName) throw new Error("active_gem is required");
+      const gemsArray: Array<{name: string}> = [
+        { name: activeGemName },
+        ...(supportGemNames || []).map((n: string) => ({ name: n })),
+      ];
       return await handleSetupSkillWithGems(
         itemSkillContext,
-        args.gems as Array<{name: string; level?: number; quality?: number; quality_id?: string; enabled?: boolean}>,
+        gemsArray,
         args.label as string | undefined,
         args.slot as string | undefined,
         args.enabled as boolean | undefined,
         args.include_in_full_dps as boolean | undefined
       );
+    }
 
     case "add_multiple_items":
       if (!args) throw new Error("Missing arguments");

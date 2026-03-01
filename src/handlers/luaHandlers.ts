@@ -334,8 +334,8 @@ export async function handleSearchTreeNodes(
       throw new Error('Lua client not initialized. Use lua_start first.');
     }
 
-    if (!keyword || keyword.trim().length === 0) {
-      throw new Error('keyword cannot be empty');
+    if (!keyword || String(keyword).trim().length === 0) {
+      throw new Error(`keyword/query cannot be empty (received: ${JSON.stringify(keyword)})`);
     }
 
     // Limit results to prevent large responses
