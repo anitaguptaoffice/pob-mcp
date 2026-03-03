@@ -414,6 +414,12 @@ export async function handleGetPassiveUpgrades(
   };
 }
 
+interface ScoredEffect {
+  stat: string;
+  dpsDelta: number;
+  ehpDelta: number;
+}
+
 export async function handleSuggestMasteries(context: PassiveUpgradesContext) {
   await context.ensureLuaClient();
   const luaClient = context.getLuaClient();
@@ -453,11 +459,6 @@ export async function handleSuggestMasteries(context: PassiveUpgradesContext) {
     }
 
     // Simulate each effect choice
-    interface ScoredEffect {
-      stat: string;
-      dpsDelta: number;
-      ehpDelta: number;
-    }
     const scored: ScoredEffect[] = [];
     for (const effect of mastery.availableEffects) {
       try {
@@ -471,6 +472,9 @@ export async function handleSuggestMasteries(context: PassiveUpgradesContext) {
     }
 
     scored.sort((a, b) => (b.dpsDelta + b.ehpDelta * 0.5) - (a.dpsDelta + a.ehpDelta * 0.5));
+    if (scored.length === 0) {
+      output += `  (simulation unavailable for this mastery)\n`;
+    }
     for (const s of scored.slice(0, 3)) {
       const dpsStr = s.dpsDelta !== 0 ? ` | DPS Delta${s.dpsDelta > 0 ? '+' : ''}${Math.round(s.dpsDelta)}` : '';
       const ehpStr = s.ehpDelta !== 0 ? ` | EHP Delta${s.ehpDelta > 0 ? '+' : ''}${Math.round(s.ehpDelta)}` : '';
