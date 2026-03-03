@@ -31,6 +31,7 @@ import { handleSearchClusterJewels, handleAnalyzeClusterJewels } from "../handle
 import { handleGenerateShoppingList } from "../handlers/shoppingListHandlers.js";
 import { handlePlanLeveling } from "../handlers/levelingHandlers.js";
 import { handleCheckBossReadiness } from "../handlers/bossReadinessHandlers.js";
+import { handleSuggestWatchersEye } from "../handlers/jewelAdvisorHandlers.js";
 
 export interface ToolRouterDependencies {
   toolGate: ToolGate;
@@ -649,6 +650,12 @@ export async function routeToolCall(
       const maxResults = (args?.max_results as number) || 10;
       return await handleGetPassiveUpgrades(upgradesContext, focus, maxResults);
     }
+
+    case "suggest_watchers_eye":
+      return await handleSuggestWatchersEye({
+        getLuaClient: deps.getLuaClient,
+        ensureLuaClient: deps.ensureLuaClient,
+      });
 
     case "check_boss_readiness":
       if (!args?.boss) throw new Error("Missing boss name");

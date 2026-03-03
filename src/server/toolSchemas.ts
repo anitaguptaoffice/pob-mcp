@@ -1482,6 +1482,14 @@ export function getBuildGoalsToolSchemas(): any[] {
       },
     },
     {
+      name: "suggest_watchers_eye",
+      description: "Recommend valuable Watcher's Eye jewel mods based on the build's active auras, ranked by tier (S/A/B) with best combo suggestions",
+      inputSchema: {
+        type: "object",
+        properties: {},
+      },
+    },
+    {
       name: "check_boss_readiness",
       description: "Check if the loaded build meets the recommended thresholds for a specific endgame boss (Shaper, Elder, Sirus, Maven, Uber Elder, Eater of Worlds, Searing Exarch)",
       inputSchema: {
