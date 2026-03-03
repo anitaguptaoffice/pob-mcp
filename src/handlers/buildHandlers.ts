@@ -135,7 +135,7 @@ export async function handleAnalyzeBuild(context: HandlerContext, buildName: str
   // Add build validation (at the end, after all data sections)
   try {
     const flaskAnalysis = context.buildService.parseFlasks(build);
-    const validation = context.validationService.validateBuild(build, flaskAnalysis);
+    const validation = context.validationService.validateBuild(build, flaskAnalysis, luaStats ?? undefined);
     summary += "\n" + context.validationService.formatValidation(validation);
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);

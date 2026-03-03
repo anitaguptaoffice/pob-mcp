@@ -72,9 +72,15 @@ export class ValidationService {
     criticalIssues: ValidationIssue[],
     warnings: ValidationIssue[]
   ): void {
-    // Get resist value (works with both Lua stats object and Map from XML)
-    const getResist = (key: string): number => {
-      return typeof stats.get === 'function' ? (stats.get(key) || 0) : (stats[key] || 0);
+    // Get resist value (works with both Lua stats object and Map from XML).
+    // Returns null when the stat is absent so callers can skip checks rather
+    // than treating a missing stat as 0% (which would be a false positive).
+    const getResist = (key: string): number | null => {
+      if (typeof stats.get === 'function') {
+        const v = stats.get(key);
+        return v != null ? Number(v) : null;
+      }
+      return stats[key] != null ? Number(stats[key]) : null;
     };
 
     const resistCap = 75;
@@ -87,6 +93,7 @@ export class ValidationService {
 
     for (const { key, name } of resistances) {
       const value = getResist(key);
+      if (value == null) continue; // stat unavailable — skip rather than false-positive
 
       if (key !== 'ChaosResist' && value < resistCap) {
         criticalIssues.push(this.createResistIssue(name, value, resistCap));
