@@ -251,7 +251,7 @@ export function getLuaToolSchemas(): any[] {
     },
     {
       name: "lua_load_build",
-      description: "Load a build file into the PoB calculation engine. Required before using other lua_* tools.",
+      description: "Load a build file into the PoB calculation engine. Required before using other lua_* tools. AUTO-RETURNS a brief summary (life, DPS, EHP, resistances, top issues) — do NOT immediately follow with lua_get_stats or get_build_issues just to get basic numbers. Call additional tools only when you need details beyond the summary.",
       inputSchema: {
         type: "object",
         properties: {
@@ -311,7 +311,7 @@ export function getLuaToolSchemas(): any[] {
     },
     {
       name: "lua_get_stats",
-      description: "Get comprehensive calculated stats from the currently loaded build (requires lua_load_build first)",
+      description: "Get comprehensive calculated stats from the currently loaded build (requires lua_load_build first). Use category='offense' for DPS details, category='defense' for survivability, category='all' only when you need everything at once. Avoid calling multiple times with different categories — pick the right one.",
       inputSchema: {
         type: "object",
         properties: {
@@ -440,7 +440,7 @@ export function getLuaToolSchemas(): any[] {
     },
     {
       name: "get_equipped_items",
-      description: "Get all currently equipped items",
+      description: "Get all currently equipped items (empty slots are omitted). Returns name, base, rarity for each equipped item. Use when you need to evaluate gear choices. For item mods/affixes, note that raw mod lines are not currently exposed.",
       inputSchema: {
         type: "object",
         properties: {},
@@ -466,7 +466,7 @@ export function getLuaToolSchemas(): any[] {
     },
     {
       name: "get_skill_setup",
-      description: "Get current skill gem setup",
+      description: "Get current skill gem setup. Default main_only=true shows only the main DPS socket group — use this first. Set main_only=false only if you need to see all utility/aura/movement groups too.",
       inputSchema: {
         type: "object",
         properties: {
@@ -707,7 +707,7 @@ export function getOptimizationToolSchemas(): any[] {
   return [
     {
       name: "analyze_defenses",
-      description: "Analyze defensive layers (avoidance / mitigation / recovery) and provide recommendations. Evaluates EHP, spell suppression, evasion, block, armour/PDR, life regen, and leech. An exceptional build has all 3 layers active.",
+      description: "Deep-dive into defensive layers (avoidance/mitigation/recovery): EHP, spell suppression, evasion, block, armour/PDR, life regen, leech. Use this when you specifically want detailed defense breakdown. validate_build already covers this — only call analyze_defenses separately if you need more defensive detail than validate_build provides.",
       inputSchema: {
         type: "object",
         properties: {
@@ -929,7 +929,7 @@ export function getValidationToolSchemas(): any[] {
   return [
     {
       name: "validate_build",
-      description: "Comprehensive build validation against the exceptional-build checklist: resistances, life pool, defensive layer count (avoidance/mitigation/recovery), mana sustain, accuracy, flask immunities, and damage scaling (more multipliers, penetration). Provides prioritized recommendations with severity levels (critical/warning/info).",
+      description: "Comprehensive build validation: resistances, life pool, defensive layers (avoidance/mitigation/recovery), mana sustain, accuracy, flask immunities, damage scaling. Provides prioritized critical/warning/info recommendations. PREFER this over get_build_issues + analyze_defenses — it covers both in one call. Do not call all three.",
       inputSchema: {
         type: "object",
         properties: {
@@ -1518,7 +1518,7 @@ export function getBuildGoalsToolSchemas(): any[] {
   return [
     {
       name: "get_build_issues",
-      description: "Analyze the currently loaded build for common issues: uncapped resistances, low health pools, over-reserved mana/life, and incomplete spell suppression. Returns categorized errors, warnings, and info messages. Requires a build to be loaded via lua_load_build.",
+      description: "Quick issue scan: uncapped resistances, low life, over-reserved mana, incomplete spell suppression. Lighter than validate_build. Use this for a fast check; use validate_build when you want full analysis including flask immunities and damage scaling. Do NOT call both.",
       inputSchema: {
         type: "object",
         properties: {},

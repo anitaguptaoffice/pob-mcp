@@ -57,11 +57,12 @@ export async function handleGetEquippedItems(context: ItemSkillHandlerContext) {
     if (!items || items.length === 0) {
       text += "No items equipped.\n";
     } else {
-      for (const item of items) {
-        text += `**${item.slot}**\n`;
-        if (item.id === 0 || !item.name) {
-          text += "  (empty)\n";
-        } else {
+      const equipped = items.filter((item: any) => item.id !== 0 && item.name);
+      if (equipped.length === 0) {
+        text += "No items equipped.\n";
+      } else {
+        for (const item of equipped) {
+          text += `**${item.slot}**\n`;
           text += `  ${item.name}`;
           if (item.baseName && item.baseName !== item.name) {
             text += ` (${item.baseName})`;
@@ -73,8 +74,8 @@ export async function handleGetEquippedItems(context: ItemSkillHandlerContext) {
           if (item.active !== undefined) {
             text += `  Active: ${item.active ? 'Yes' : 'No'}\n`;
           }
+          text += "\n";
         }
-        text += "\n";
       }
     }
 
