@@ -128,13 +128,11 @@ export async function handleLuaLoadBuild(
 
     await luaClient.loadBuildXml(xml, name);
 
-    // Check for multiple specs / item sets and inform the user
+    // Check for multiple specs / item sets and inform the user (sequential — bridge is single-request)
     let extra = '';
     try {
-      const [specsResult, itemSetsResult] = await Promise.all([
-        luaClient.listSpecs(),
-        luaClient.listItemSets(),
-      ]);
+      const specsResult = await luaClient.listSpecs();
+      const itemSetsResult = await luaClient.listItemSets();
       if (specsResult?.specs?.length > 1) {
         extra += `\n\n📋 This build has ${specsResult.specs.length} passive tree specs:`;
         for (const s of specsResult.specs) {
@@ -153,31 +151,26 @@ export async function handleLuaLoadBuild(
       // Non-fatal: spec/item set info is advisory only
     }
 
-    // Auto-context: fetch stats + top issues after successful load
+    // Auto-context: fetch stats + top issues after successful load (sequential — bridge is single-request)
     let summary = '';
     try {
-      const [statsResult, issuesResult, infoResult] = await Promise.allSettled([
-        luaClient.getStats(['Life', 'TotalDPS', 'CombinedDPS', 'MinionTotalDPS',
-          'FireResist', 'ColdResist', 'LightningResist', 'ChaosResist', 'TotalEHP']),
-        handleGetBuildIssues({ getLuaClient: context.getLuaClient, ensureLuaClient: async () => {} }),
-        luaClient.getBuildInfo(),
-      ]);
-
-      if (infoResult.status === 'fulfilled') {
-        const info = infoResult.value;
+      const info = await luaClient.getBuildInfo().catch(() => null);
+      if (info) {
         summary += `\n**${info.name || name}** | Level ${info.level} ${info.class}${info.ascendancy ? ` (${info.ascendancy})` : ''}\n`;
       }
 
-      if (statsResult.status === 'fulfilled') {
-        const s = statsResult.value;
+      const s = await luaClient.getStats(['Life', 'TotalDPS', 'CombinedDPS', 'MinionTotalDPS',
+        'FireResist', 'ColdResist', 'LightningResist', 'ChaosResist', 'TotalEHP']).catch(() => null);
+      if (s) {
         const dps = Number(s.CombinedDPS || s.TotalDPS || s.MinionTotalDPS || 0);
         const dpsLabel = (s.MinionTotalDPS && !s.TotalDPS) ? 'Minion DPS' : 'DPS';
         summary += `Life: ${Number(s.Life ?? 0).toLocaleString()} | ${dpsLabel}: ${Math.round(dps).toLocaleString()} | EHP: ${Number(s.TotalEHP ?? 0).toLocaleString()}\n`;
         summary += `Resists: F${s.FireResist}% C${s.ColdResist}% L${s.LightningResist}% Ch${s.ChaosResist}%\n`;
       }
 
-      if (issuesResult.status === 'fulfilled') {
-        const { issues } = issuesResult.value;
+      const issuesResult = await handleGetBuildIssues({ getLuaClient: context.getLuaClient, ensureLuaClient: async () => {} }).catch(() => null);
+      if (issuesResult) {
+        const { issues } = issuesResult;
         const topIssues = issues.filter((i: any) => i.severity === 'error' || i.severity === 'warning').slice(0, 3);
         if (topIssues.length > 0) {
           summary += '\n**Top Issues:**\n';

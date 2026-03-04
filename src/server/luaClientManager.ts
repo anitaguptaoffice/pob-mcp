@@ -30,7 +30,13 @@ export class LuaClientManager {
     }
 
     if (this.client) {
-      return; // Already initialized
+      if (this.client.isAlive()) {
+        return; // Already initialized and healthy
+      }
+      // Process died — clean up the dead client so we restart below
+      console.error('[Lua Bridge] Client process died, restarting...');
+      try { await this.client.stop(); } catch {}
+      this.client = null;
     }
 
     console.error('[Lua Bridge] Initializing client...');

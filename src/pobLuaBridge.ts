@@ -22,7 +22,14 @@ export class PoBLuaApiClient {
   private killed = false;
   private dataEmitter = new EventEmitter();
 
+  /** Returns true if the process is running and ready to accept requests. */
+  isAlive(): boolean {
+    return !this.killed && this.ready && !!this.proc;
+  }
+
   constructor(options: PoBLuaApiOptions = {}) {
+    // Prevent unhandled 'error' events (emitted on process exit) from crashing Node.js
+    this.dataEmitter.on("error", () => {});
     const forkSrc = options.cwd || path.join(os.homedir(), "Projects", "PathOfBuilding", "src");
     this.options = {
       cwd: forkSrc,
