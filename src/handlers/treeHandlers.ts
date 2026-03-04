@@ -360,7 +360,10 @@ export async function handleGetPassiveUpgrades(
       const out = await luaClient.calcWith({ addNodes: [node.id] });
       if (!out) continue;
 
-      const outDPS = (out.CombinedDPS as number) || (out.TotalDPS as number) || (out.MinionTotalDPS as number) || baseDPS;
+      // calcWith returns raw Lua output; minion stats are nested under out.Minion
+      // (unlike getStats() which remaps them to MinionTotalDPS etc.)
+      const outDPS = (out.CombinedDPS as number) || (out.TotalDPS as number) ||
+                     (out.Minion?.CombinedDPS as number) || (out.Minion?.TotalDPS as number) || baseDPS;
       const outEHP = (out.TotalEHP as number) || (out.Life as number) || baseEHP;
 
       const dpsDelta = outDPS - baseDPS;
@@ -465,13 +468,19 @@ export async function handleSuggestMasteries(context: PassiveUpgradesContext) {
         const newMasteryEffects = { ...currentMasteryEffects, [mastery.nodeId]: effect.effectId };
         const out = await luaClient.calcWith({ masteryEffects: newMasteryEffects });
         if (!out) continue;
-        const outDPS = (out.CombinedDPS as number) || (out.TotalDPS as number) || (out.MinionTotalDPS as number) || baseDPS;
+        // calcWith returns raw Lua output; minion stats nested under out.Minion
+        const outDPS = (out.CombinedDPS as number) || (out.TotalDPS as number) ||
+                       (out.Minion?.CombinedDPS as number) || (out.Minion?.TotalDPS as number) || baseDPS;
         const outEHP = (out.TotalEHP as number) || (out.Life as number) || baseEHP;
         scored.push({ stat: effect.stat, dpsDelta: outDPS - baseDPS, ehpDelta: outEHP - baseEHP });
       } catch { /* skip effects that fail simulation */ }
     }
 
-    scored.sort((a, b) => (b.dpsDelta + b.ehpDelta * 0.5) - (a.dpsDelta + a.ehpDelta * 0.5));
+    // Sort by relative gain (same formula as handleGetPassiveUpgrades to avoid raw-value scale mismatch)
+    scored.sort((a, b) =>
+      ((b.dpsDelta / baseDPS) + (b.ehpDelta / baseEHP)) -
+      ((a.dpsDelta / baseDPS) + (a.ehpDelta / baseEHP))
+    );
     if (scored.length === 0) {
       output += `  (simulation unavailable for this mastery)\n`;
     }
