@@ -1,4 +1,5 @@
 import type { PoBLuaApiClient } from "../pobLuaBridge.js";
+import { wrapHandler } from "../utils/errorHandling.js";
 
 export interface BossReadinessContext {
   getLuaClient: () => PoBLuaApiClient | null;
@@ -76,6 +77,7 @@ const BOSS_ALIASES: Record<string, string> = {
 };
 
 export async function handleCheckBossReadiness(context: BossReadinessContext, boss: string) {
+  return wrapHandler('check boss readiness', async () => {
   await context.ensureLuaClient();
   const luaClient = context.getLuaClient();
   if (!luaClient) throw new Error('Lua bridge not active. Use lua_load_build first.');
@@ -173,4 +175,5 @@ export async function handleCheckBossReadiness(context: BossReadinessContext, bo
   for (const m of threshold.mechanics) output += `  - ${m}\n`;
 
   return { content: [{ type: 'text' as const, text: output }] };
+  });
 }

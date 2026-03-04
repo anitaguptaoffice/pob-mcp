@@ -5,6 +5,7 @@ import type { OptimizationConstraints } from "../treeOptimizer.js";
 import path from "path";
 import fs from "fs/promises";
 import { analyzeDefenses, formatDefensiveAnalysis } from "../defensiveAnalyzer.js";
+import { wrapHandler } from "../utils/errorHandling.js";
 
 export interface OptimizationHandlerContext {
   buildService: BuildService;
@@ -18,7 +19,7 @@ export async function handleAnalyzeDefenses(
   context: OptimizationHandlerContext,
   buildName?: string
 ) {
-  try {
+  return wrapHandler('analyze defenses', async () => {
     if (!buildName) {
       throw new Error('build_name is required. Please specify which build to analyze.');
     }
@@ -30,10 +31,8 @@ export async function handleAnalyzeDefenses(
       throw new Error('Lua client not initialized.');
     }
 
-    const targetBuild = buildName;
-
     // Load the build into the Lua bridge
-    const buildPath = path.join(context.pobDirectory, targetBuild);
+    const buildPath = path.join(context.pobDirectory, buildName);
     const buildXml = await fs.readFile(buildPath, 'utf-8');
 
     await luaClient.loadBuildXml(buildXml, 'Defense Analysis');
@@ -45,15 +44,14 @@ export async function handleAnalyzeDefenses(
     const life = stats.Life || 0;
     if (life <= 60) {
       throw new Error(
-        `Build "${targetBuild}" appears to be in default/empty state. The build may not have loaded correctly.`
+        `Build "${buildName}" appears to be in default/empty state. The build may not have loaded correctly.`
       );
     }
 
     // Analyze defenses
     const analysis = analyzeDefenses(stats);
 
-    // Format for output
-    let text = `Analyzing: ${targetBuild}\n\n`;
+    let text = `Analyzing: ${buildName}\n\n`;
     text += formatDefensiveAnalysis(analysis);
 
     return {
@@ -64,10 +62,7 @@ export async function handleAnalyzeDefenses(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to analyze defenses: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleSuggestOptimalNodes(
@@ -76,7 +71,7 @@ export async function handleSuggestOptimalNodes(
   goalString: string,
   pointsAvailable?: number
 ) {
-  try {
+  return wrapHandler('suggest optimal nodes', async () => {
     await context.ensureLuaClient();
     const luaClient = context.getLuaClient();
     if (!luaClient) throw new Error('Lua client not initialized');
@@ -231,12 +226,7 @@ export async function handleSuggestOptimalNodes(
     return {
       content: [{ type: "text" as const, text }],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    return {
-      content: [{ type: "text" as const, text: `Error: ${errorMsg}` }],
-    };
-  }
+  });
 }
 
 export async function handleOptimizeTree(
@@ -247,7 +237,7 @@ export async function handleOptimizeTree(
   maxIterations?: number,
   constraints?: OptimizationConstraints
 ) {
-  try {
+  return wrapHandler('optimize tree', async () => {
     await context.ensureLuaClient();
     const luaClient = context.getLuaClient();
     if (!luaClient) throw new Error('Lua client not initialized');
@@ -341,10 +331,5 @@ export async function handleOptimizeTree(
     return {
       content: [{ type: "text" as const, text }],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    return {
-      content: [{ type: "text" as const, text: `Error: ${errorMsg}` }],
-    };
-  }
+  });
 }

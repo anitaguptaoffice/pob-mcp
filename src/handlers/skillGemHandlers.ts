@@ -1,6 +1,7 @@
 import type { BuildService } from "../services/buildService.js";
 import type { SkillGemService } from "../services/skillGemService.js";
 import type { PoBLuaApiClient } from "../pobLuaBridge.js";
+import { wrapHandler } from "../utils/errorHandling.js";
 
 export interface SkillGemHandlerContext {
   buildService: BuildService;
@@ -17,6 +18,7 @@ export async function handleAnalyzeSkillLinks(
   context: SkillGemHandlerContext,
   args?: { build_name?: string; skill_index?: number }
 ) {
+  return wrapHandler('analyze skill links', async () => {
   const { buildService, skillGemService } = context;
 
   if (!args?.build_name) {
@@ -29,52 +31,55 @@ export async function handleAnalyzeSkillLinks(
   const analysis = skillGemService.analyzeSkillLinks(buildData, skillIndex);
 
   // Format output
-  let output = `=== Skill Analysis: ${analysis.activeSkill.name} ===\n\n`;
-
-  output += `Active Skill: ${analysis.activeSkill.name} (Level ${analysis.activeSkill.level}/${analysis.activeSkill.quality})\n`;
-  output += `Tags: ${analysis.activeSkill.tags.join(", ")}\n`;
-  output += `Archetype: ${analysis.archetype}\n\n`;
-
-  output += `=== Support Gems (${analysis.linkCount}-Link) ===\n`;
+  const outputLines: string[] = [
+    `=== Skill Analysis: ${analysis.activeSkill.name} ===`,
+    '',
+    `Active Skill: ${analysis.activeSkill.name} (Level ${analysis.activeSkill.level}/${analysis.activeSkill.quality})`,
+    `Tags: ${analysis.activeSkill.tags.join(", ")}`,
+    `Archetype: ${analysis.archetype}`,
+    '',
+    `=== Support Gems (${analysis.linkCount}-Link) ===`,
+  ];
 
   for (let i = 0; i < analysis.supports.length; i++) {
     const support = analysis.supports[i];
     const symbol = support.rating === "excellent" ? "✓" : support.rating === "poor" ? "✗" : "⚠";
 
-    output += `${i + 1}. ${symbol} ${support.name} (${support.level}/${support.quality}) - ${
+    outputLines.push(`${i + 1}. ${symbol} ${support.name} (${support.level}/${support.quality}) - ${
       support.rating.charAt(0).toUpperCase() + support.rating.slice(1)
-    }\n`;
+    }`);
 
     if (support.issues && support.issues.length > 0) {
       for (const issue of support.issues) {
-        output += `   ⚠ ${issue}\n`;
+        outputLines.push(`   ⚠ ${issue}`);
       }
     }
 
     if (support.recommendations && support.recommendations.length > 0) {
       for (const rec of support.recommendations) {
-        output += `   → ${rec}\n`;
+        outputLines.push(`   → ${rec}`);
       }
     }
   }
 
   if (analysis.issues.length > 0) {
-    output += `\n=== Issues Detected ===\n`;
+    outputLines.push('', '=== Issues Detected ===');
     for (const issue of analysis.issues) {
-      output += `⚠ ${issue}\n`;
+      outputLines.push(`⚠ ${issue}`);
     }
   }
 
-  output += `\n=== Archetype Match: ${Math.round(analysis.archetypeMatch)}% ===\n`;
+  outputLines.push(`\n=== Archetype Match: ${Math.round(analysis.archetypeMatch)}% ===`);
   if (analysis.archetypeMatch >= 80) {
-    output += `Strong alignment with "${analysis.archetype}" archetype\n`;
+    outputLines.push(`Strong alignment with "${analysis.archetype}" archetype`);
   } else if (analysis.archetypeMatch >= 60) {
-    output += `Moderate alignment with "${analysis.archetype}" archetype\n`;
+    outputLines.push(`Moderate alignment with "${analysis.archetype}" archetype`);
   } else {
-    output += `Weak alignment with "${analysis.archetype}" archetype - consider reviewing gem choices\n`;
+    outputLines.push(`Weak alignment with "${analysis.archetype}" archetype - consider reviewing gem choices`);
   }
 
-  output += `\n💡 Use suggest_support_gems to see recommended improvements\n`;
+  outputLines.push('', '💡 Use suggest_support_gems to see recommended improvements');
+  const output = outputLines.join('\n');
 
   return {
     content: [
@@ -84,6 +89,7 @@ export async function handleAnalyzeSkillLinks(
       },
     ],
   };
+  });
 }
 
 /**
@@ -99,6 +105,7 @@ export async function handleSuggestSupportGems(
     budget?: "league_start" | "mid_league" | "endgame";
   }
 ) {
+  return wrapHandler('suggest support gems', async () => {
   const { buildService, skillGemService } = context;
 
   if (!args?.build_name) {
@@ -118,42 +125,45 @@ export async function handleSuggestSupportGems(
   const analysis = skillGemService.analyzeSkillLinks(buildData, skillIndex);
 
   // Format output
-  let output = `=== Support Gem Recommendations for ${analysis.activeSkill.name} ===\n\n`;
+  const outputLines: string[] = [
+    `=== Support Gem Recommendations for ${analysis.activeSkill.name} ===`,
+    '',
+  ];
 
   if (suggestions.length === 0) {
-    output += `No recommendations found. Your current setup appears optimal!\n`;
+    outputLines.push('No recommendations found. Your current setup appears optimal!');
     return {
       content: [
         {
           type: "text" as const,
-          text: output,
+          text: outputLines.join('\n'),
         },
       ],
     };
   }
 
-  output += `Top ${suggestions.length} Recommendations:\n\n`;
+  outputLines.push(`Top ${suggestions.length} Recommendations:`, '');
 
   for (let i = 0; i < suggestions.length; i++) {
     const suggestion = suggestions[i];
 
-    output += `${i + 1}. ${suggestion.gem}\n`;
+    outputLines.push(`${i + 1}. ${suggestion.gem}`);
     if (suggestion.replaces) {
-      output += `   Replaces: ${suggestion.replaces}\n`;
+      outputLines.push(`   Replaces: ${suggestion.replaces}`);
     }
-    output += `   Est. DPS Increase: +${suggestion.dpsIncrease.toFixed(1)}%\n`;
-    output += `   Why: ${suggestion.reasoning}\n`;
-    output += `   Cost: ${suggestion.cost}\n`;
+    outputLines.push(`   Est. DPS Increase: +${suggestion.dpsIncrease.toFixed(1)}%`);
+    outputLines.push(`   Why: ${suggestion.reasoning}`);
+    outputLines.push(`   Cost: ${suggestion.cost}`);
 
     if (suggestion.requires && suggestion.requires.length > 0) {
-      output += `   Requires: ${suggestion.requires.join(", ")}\n`;
+      outputLines.push(`   Requires: ${suggestion.requires.join(", ")}`);
     }
 
     if (suggestion.conflicts && suggestion.conflicts.length > 0) {
-      output += `   ⚠ Conflicts: ${suggestion.conflicts.join(", ")}\n`;
+      outputLines.push(`   ⚠ Conflicts: ${suggestion.conflicts.join(", ")}`);
     }
 
-    output += `\n`;
+    outputLines.push('');
   }
 
   // Add budget-specific recommendations
@@ -162,11 +172,12 @@ export async function handleSuggestSupportGems(
   const bestEndgame = suggestions.find((s) => s.dpsIncrease === Math.max(...suggestions.map((s) => s.dpsIncrease)));
 
   if (bestBudget && budget === "endgame") {
-    output += `💡 Best Bang-for-Buck: ${bestBudget.gem} (+${bestBudget.dpsIncrease.toFixed(1)}% for ${bestBudget.cost})\n`;
+    outputLines.push(`💡 Best Bang-for-Buck: ${bestBudget.gem} (+${bestBudget.dpsIncrease.toFixed(1)}% for ${bestBudget.cost})`);
   }
   if (bestEndgame) {
-    output += `💡 ${budget === "endgame" ? "Endgame" : "Best"} Priority: ${bestEndgame.gem} (+${bestEndgame.dpsIncrease.toFixed(1)}%)\n`;
+    outputLines.push(`💡 ${budget === "endgame" ? "Endgame" : "Best"} Priority: ${bestEndgame.gem} (+${bestEndgame.dpsIncrease.toFixed(1)}%)`);
   }
+  const output = outputLines.join('\n');
 
   return {
     content: [
@@ -176,6 +187,7 @@ export async function handleSuggestSupportGems(
       },
     ],
   };
+  });
 }
 
 /**
@@ -206,9 +218,13 @@ export async function handleCompareGemSetups(
   const skillIndex = args.skill_index || 0;
   const activeSkillName = skills[skillIndex]?.gems[0]?.nameSpec || "Unknown Skill";
 
-  let output = `=== Gem Setup Comparison for ${activeSkillName} ===\n\n`;
-  output += `NOTE: Live DPS simulation per-setup is not yet supported (gem-swap requires PoB API extension).\n`;
-  output += `Showing structural analysis of each setup.\n\n`;
+  const outputLines: string[] = [
+    `=== Gem Setup Comparison for ${activeSkillName} ===`,
+    '',
+    'NOTE: Live DPS simulation per-setup is not yet supported (gem-swap requires PoB API extension).',
+    'Showing structural analysis of each setup.',
+    '',
+  ];
 
   // Known "more" multiplier support gems
   const MORE_MULTIPLIERS = new Set([
@@ -232,18 +248,19 @@ export async function handleCompareGemSetups(
     const moreCount = setup.gems.filter(g => MORE_MULTIPLIERS.has(g)).length;
     const hasPen = setup.gems.some(g => PENETRATION_GEMS.has(g));
 
-    output += `Setup ${letter}: "${setup.name}"\n`;
-    output += `  Gems (${setup.gems.length}-link): ${setup.gems.join(", ")}\n`;
-    output += `  "More" multipliers: ${moreCount}`;
-    if (setup.gems.length >= 5 && moreCount < 2) output += ` ⚠ (low for a ${setup.gems.length}-link)`;
-    output += `\n`;
-    output += `  Penetration: ${hasPen ? 'Yes' : 'None'}`;
-    if (!hasPen) output += ` ⚠`;
-    output += `\n\n`;
+    outputLines.push(`Setup ${letter}: "${setup.name}"`);
+    outputLines.push(`  Gems (${setup.gems.length}-link): ${setup.gems.join(", ")}`);
+    let moreLine = `  "More" multipliers: ${moreCount}`;
+    if (setup.gems.length >= 5 && moreCount < 2) moreLine += ` ⚠ (low for a ${setup.gems.length}-link)`;
+    outputLines.push(moreLine);
+    let penLine = `  Penetration: ${hasPen ? 'Yes' : 'None'}`;
+    if (!hasPen) penLine += ` ⚠`;
+    outputLines.push(penLine, '');
   }
 
-  output += `=== Note ===\n`;
-  output += `For accurate DPS comparison, use add_gem + lua_get_stats to manually test each setup.\n`;
+  outputLines.push('=== Note ===');
+  outputLines.push('For accurate DPS comparison, use add_gem + lua_get_stats to manually test each setup.');
+  const output = outputLines.join('\n');
 
   return {
     content: [
@@ -275,49 +292,50 @@ export async function handleValidateGemQuality(
   });
 
   // Format output
-  let output = `=== Gem Quality Validation ===\n\n`;
+  const outputLines: string[] = ['=== Gem Quality Validation ===', ''];
 
   if (validation.needsQuality.length > 0) {
-    output += `⚠ ${validation.needsQuality.length} gem(s) need quality improvement:\n`;
+    outputLines.push(`⚠ ${validation.needsQuality.length} gem(s) need quality improvement:`);
     for (let i = 0; i < validation.needsQuality.length; i++) {
       const gem = validation.needsQuality[i];
-      output += `${i + 1}. ${gem.gem}: ${gem.current} → ${gem.recommended} (Impact: ${gem.impact})\n`;
+      outputLines.push(`${i + 1}. ${gem.gem}: ${gem.current} → ${gem.recommended} (Impact: ${gem.impact})`);
     }
-    output += `\n`;
+    outputLines.push('');
   } else {
-    output += `✓ All gems have quality 20\n\n`;
+    outputLines.push('✓ All gems have quality 20', '');
   }
 
   if (validation.awakenedUpgrades.length > 0) {
-    output += `⭐ Awakened Gem Upgrades Available:\n`;
+    outputLines.push('⭐ Awakened Gem Upgrades Available:');
     for (let i = 0; i < validation.awakenedUpgrades.length; i++) {
       const upgrade = validation.awakenedUpgrades[i];
-      output += `${i + 1}. ${upgrade.gem} → ${upgrade.awakened}\n`;
-      output += `   Est. DPS Gain: ${upgrade.dpsGain}\n`;
+      outputLines.push(`${i + 1}. ${upgrade.gem} → ${upgrade.awakened}`);
+      outputLines.push(`   Est. DPS Gain: ${upgrade.dpsGain}`);
     }
-    output += `\n`;
+    outputLines.push('');
   }
 
   if (validation.corruptionTargets && validation.corruptionTargets.length > 0) {
-    output += `💎 Corruption Opportunities:\n`;
+    outputLines.push('💎 Corruption Opportunities:');
     for (let i = 0; i < validation.corruptionTargets.length; i++) {
       const target = validation.corruptionTargets[i];
-      output += `${i + 1}. ${target.gem} (current) → ${target.target} (corrupted)\n`;
-      output += `   Risk: ${target.risk}\n`;
+      outputLines.push(`${i + 1}. ${target.gem} (current) → ${target.target} (corrupted)`);
+      outputLines.push(`   Risk: ${target.risk}`);
     }
-    output += `\n`;
+    outputLines.push('');
   }
 
   if (validation.needsQuality.length > 0) {
     const highPriority = validation.needsQuality.find((g) => g.impact === "High");
     if (highPriority) {
-      output += `💡 Priority: Quality your ${highPriority.gem} first (highest impact)\n`;
+      outputLines.push(`💡 Priority: Quality your ${highPriority.gem} first (highest impact)`);
     }
   } else if (validation.awakenedUpgrades.length > 0) {
-    output += `💡 Consider awakened gem upgrades for significant DPS improvements\n`;
+    outputLines.push('💡 Consider awakened gem upgrades for significant DPS improvements');
   } else {
-    output += `🎉 Your gems are fully optimized!\n`;
+    outputLines.push('🎉 Your gems are fully optimized!');
   }
+  const output = outputLines.join('\n');
 
   return {
     content: [
@@ -366,49 +384,51 @@ export async function handleFindOptimalLinks(
   const optimizeFor = args.optimize_for || "dps";
 
   // Format output
-  let output = `=== Optimal ${args.link_count}-Link for ${analysis.activeSkill.name} ===\n\n`;
-
-  output += `Optimization Target: ${optimizeFor.toUpperCase()}\n`;
-  output += `Budget: ${budget.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}\n\n`;
-
-  output += `🏆 Optimal Setup:\n`;
-  output += `1. ${analysis.activeSkill.name} (${analysis.activeSkill.level}/${analysis.activeSkill.quality})\n`;
+  const outputLines: string[] = [
+    `=== Optimal ${args.link_count}-Link for ${analysis.activeSkill.name} ===`,
+    '',
+    `Optimization Target: ${optimizeFor.toUpperCase()}`,
+    `Budget: ${budget.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}`,
+    '',
+    '🏆 Optimal Setup:',
+    `1. ${analysis.activeSkill.name} (${analysis.activeSkill.level}/${analysis.activeSkill.quality})`,
+  ];
 
   for (let i = 0; i < Math.min(suggestions.length, args.link_count - 1); i++) {
-    const suggestion = suggestions[i];
-    output += `${i + 2}. ${suggestion.gem}\n`;
+    outputLines.push(`${i + 2}. ${suggestions[i].gem}`);
   }
 
-  output += `\n=== Upgrade Path ===\n\n`;
+  outputLines.push('', '=== Upgrade Path ===', '');
 
   let cumulativeDPS = 0;
   for (let i = 0; i < Math.min(suggestions.length, args.link_count - 1); i++) {
     const suggestion = suggestions[i];
     cumulativeDPS += suggestion.dpsIncrease;
 
-    output += `Step ${i + 1}: Add ${suggestion.gem}`;
+    let stepLine = `Step ${i + 1}: Add ${suggestion.gem}`;
     if (suggestion.replaces) {
-      output += ` (replace ${suggestion.replaces})`;
+      stepLine += ` (replace ${suggestion.replaces})`;
     }
-    output += `\n`;
-    output += `Cost: ${suggestion.cost}\n`;
-    output += `Est. DPS Increase: +${suggestion.dpsIncrease.toFixed(1)}%\n`;
-    output += `\n`;
+    outputLines.push(stepLine);
+    outputLines.push(`Cost: ${suggestion.cost}`);
+    outputLines.push(`Est. DPS Increase: +${suggestion.dpsIncrease.toFixed(1)}%`);
+    outputLines.push('');
   }
 
-  output += `=== Summary ===\n`;
-  output += `Total Est. DPS Increase: +${cumulativeDPS.toFixed(1)}%\n`;
+  outputLines.push('=== Summary ===');
+  outputLines.push(`Total Est. DPS Increase: +${cumulativeDPS.toFixed(1)}%`);
 
   if (budget === "league_start") {
-    output += `\n💡 League start setup focuses on easily obtainable gems\n`;
+    outputLines.push('', '💡 League start setup focuses on easily obtainable gems');
   } else if (budget === "mid_league") {
-    output += `\n💡 Mid-league setup balances cost and performance\n`;
+    outputLines.push('', '💡 Mid-league setup balances cost and performance');
   } else {
     const bestSuggestion = suggestions[0];
     if (bestSuggestion) {
-      output += `\n💡 Best first upgrade: ${bestSuggestion.gem} (+${bestSuggestion.dpsIncrease.toFixed(1)}%)\n`;
+      outputLines.push('', `💡 Best first upgrade: ${bestSuggestion.gem} (+${bestSuggestion.dpsIncrease.toFixed(1)}%)`);
     }
   }
+  const output = outputLines.join('\n');
 
   return {
     content: [
@@ -526,26 +546,26 @@ export async function handleGemUpgradePath(
 
   upgrades.sort((a, b) => b.priority - a.priority);
 
-  let output = '=== Gem Upgrade Path ===\n';
-  output += `Budget tier: ${budgetTier}\n\n`;
+  const outputLines: string[] = ['=== Gem Upgrade Path ===', `Budget tier: ${budgetTier}`, ''];
 
   if (upgrades.length === 0) {
-    output += 'All gems appear to be fully upgraded!\n';
-    return { content: [{ type: 'text' as const, text: output }] };
+    outputLines.push('All gems appear to be fully upgraded!');
+    return { content: [{ type: 'text' as const, text: outputLines.join('\n') }] };
   }
 
   let rank = 1;
   for (const u of upgrades.slice(0, 15)) {
-    output += `**${rank}. ${u.gemName}** (${u.groupLabel})\n`;
-    output += `   Action: ${u.action}\n`;
-    output += `   Cost: ${u.costEstimate}\n`;
-    output += `   Why: ${u.reason}\n\n`;
+    outputLines.push(`**${rank}. ${u.gemName}** (${u.groupLabel})`);
+    outputLines.push(`   Action: ${u.action}`);
+    outputLines.push(`   Cost: ${u.costEstimate}`);
+    outputLines.push(`   Why: ${u.reason}`);
+    outputLines.push('');
     rank++;
   }
 
-  output += '_Use `validate_gem_quality` for a full gem quality audit._\n';
+  outputLines.push('_Use `validate_gem_quality` for a full gem quality audit._');
 
-  return { content: [{ type: 'text' as const, text: output }] };
+  return { content: [{ type: 'text' as const, text: outputLines.join('\n') }] };
 }
 
 /**

@@ -1,4 +1,5 @@
 import type { PoBLuaApiClient } from "../pobLuaBridge.js";
+import { wrapHandler } from "../utils/errorHandling.js";
 
 export interface ItemSkillHandlerContext {
   getLuaClient: () => PoBLuaApiClient | null;
@@ -11,7 +12,7 @@ export async function handleAddItem(
   slotName?: string,
   noAutoEquip?: boolean
 ) {
-  try {
+  return wrapHandler('add item', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -25,7 +26,7 @@ export async function handleAddItem(
 
     const result = await luaClient.addItem(itemText, slotName, noAutoEquip);
 
-    let text = `✅ Item added: ${result.name || 'Unknown'} → ${result.slot || 'Not equipped'}`;
+    const text = `✅ Item added: ${result.name || 'Unknown'} → ${result.slot || 'Not equipped'}`;
 
     return {
       content: [
@@ -35,14 +36,11 @@ export async function handleAddItem(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to add item: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleGetEquippedItems(context: ItemSkillHandlerContext) {
-  try {
+  return wrapHandler('get equipped items', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -87,10 +85,7 @@ export async function handleGetEquippedItems(context: ItemSkillHandlerContext) {
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to get equipped items: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleToggleFlask(
@@ -98,7 +93,7 @@ export async function handleToggleFlask(
   flaskNumber: number,
   active: boolean
 ) {
-  try {
+  return wrapHandler('toggle flask', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -138,14 +133,11 @@ export async function handleToggleFlask(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to toggle flask: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleGetSkillSetup(context: ItemSkillHandlerContext, mainOnly: boolean = true) {
-  try {
+  return wrapHandler('get skill setup', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -210,10 +202,7 @@ export async function handleGetSkillSetup(context: ItemSkillHandlerContext, main
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to get skill setup: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleSetMainSkill(
@@ -222,7 +211,7 @@ export async function handleSetMainSkill(
   activeSkillIndex?: number,
   skillPart?: number
 ) {
-  try {
+  return wrapHandler('set main skill', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -257,10 +246,7 @@ export async function handleSetMainSkill(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to set main skill: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleCreateSocketGroup(
@@ -270,7 +256,7 @@ export async function handleCreateSocketGroup(
   enabled?: boolean,
   includeInFullDPS?: boolean
 ) {
-  try {
+  return wrapHandler('create socket group', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -299,10 +285,7 @@ export async function handleCreateSocketGroup(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to create socket group: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleAddGem(
@@ -314,7 +297,7 @@ export async function handleAddGem(
   qualityId?: string,
   enabled?: boolean
 ) {
-  try {
+  return wrapHandler('add gem', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -349,10 +332,7 @@ export async function handleAddGem(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to add gem: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleSetGemLevel(
@@ -361,7 +341,7 @@ export async function handleSetGemLevel(
   gemIndex: number,
   level: number
 ) {
-  try {
+  return wrapHandler('set gem level', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -393,10 +373,7 @@ export async function handleSetGemLevel(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to set gem level: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleSetGemQuality(
@@ -406,7 +383,7 @@ export async function handleSetGemQuality(
   quality: number,
   qualityId?: string
 ) {
-  try {
+  return wrapHandler('set gem quality', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -438,17 +415,14 @@ export async function handleSetGemQuality(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to set gem quality: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleRemoveSkill(
   context: ItemSkillHandlerContext,
   groupIndex: number
 ) {
-  try {
+  return wrapHandler('remove skill group', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -472,10 +446,7 @@ export async function handleRemoveSkill(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to remove socket group: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleRemoveGem(
@@ -483,7 +454,7 @@ export async function handleRemoveGem(
   groupIndex: number,
   gemIndex: number
 ) {
-  try {
+  return wrapHandler('remove gem', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -511,10 +482,7 @@ export async function handleRemoveGem(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to remove gem: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleSetupSkillWithGems(
@@ -531,7 +499,7 @@ export async function handleSetupSkillWithGems(
   enabled?: boolean,
   includeInFullDPS?: boolean
 ) {
-  try {
+  return wrapHandler('setup skill with gems', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -585,10 +553,7 @@ export async function handleSetupSkillWithGems(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to setup skill with gems: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleAddMultipleItems(
@@ -598,7 +563,7 @@ export async function handleAddMultipleItems(
     slot_name?: string;
   }>
 ) {
-  try {
+  return wrapHandler('add multiple items', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -631,8 +596,5 @@ export async function handleAddMultipleItems(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to add multiple items: ${errorMsg}`);
-  }
+  });
 }

@@ -1,4 +1,5 @@
 import type { PoBLuaApiClient } from "../pobLuaBridge.js";
+import { wrapHandler } from "../utils/errorHandling.js";
 
 export interface JewelAdvisorContext {
   getLuaClient: () => PoBLuaApiClient | null;
@@ -81,6 +82,7 @@ function detectActiveAuras(groups: any[]): string[] {
 }
 
 export async function handleSuggestWatchersEye(context: JewelAdvisorContext) {
+  return wrapHandler('suggest watchers eye', async () => {
   await context.ensureLuaClient();
   const luaClient = context.getLuaClient();
   if (!luaClient) throw new Error('Lua bridge not active. Use lua_load_build first.');
@@ -132,4 +134,5 @@ export async function handleSuggestWatchersEye(context: JewelAdvisorContext) {
   output += `_Use \`get_currency_rates\` to estimate current market prices for specific mods._\n`;
 
   return { content: [{ type: 'text' as const, text: output }] };
+  });
 }

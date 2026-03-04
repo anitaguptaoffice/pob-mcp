@@ -2,6 +2,7 @@ import type { BuildService } from "../services/buildService.js";
 import type { BuildExportService } from "../services/buildExportService.js";
 import type { PoBLuaApiClient } from "../pobLuaBridge.js";
 import type { ExportContext } from "../utils/contextBuilder.js";
+import { wrapHandler } from "../utils/errorHandling.js";
 
 export interface ExportHandlerContext {
   buildService: BuildService;
@@ -19,6 +20,7 @@ export async function handleExportBuild(
     notes?: string;
   }
 ) {
+  return wrapHandler('export build', async () => {
   const { exportService, buildService } = context;
 
   // Read the source build
@@ -49,6 +51,7 @@ export async function handleExportBuild(
       },
     ],
   };
+  });
 }
 
 export async function handleSaveTree(
@@ -60,6 +63,7 @@ export async function handleSaveTree(
     backup?: boolean;
   }
 ) {
+  return wrapHandler('save tree', async () => {
   const { exportService, buildService } = context;
 
   const result = await exportService.saveTree(buildService, {
@@ -85,6 +89,7 @@ export async function handleSaveTree(
       },
     ],
   };
+  });
 }
 
 export async function handleSnapshotBuild(
@@ -95,6 +100,7 @@ export async function handleSnapshotBuild(
     tag?: string;
   }
 ) {
+  return wrapHandler('snapshot build', async () => {
   const { exportService, buildService } = context;
 
   const result = await exportService.snapshotBuild(buildService, {
@@ -117,6 +123,7 @@ export async function handleSnapshotBuild(
       },
     ],
   };
+  });
 }
 
 export async function handleListSnapshots(
@@ -127,6 +134,7 @@ export async function handleListSnapshots(
     tag_filter?: string;
   }
 ) {
+  return wrapHandler('list snapshots', async () => {
   const { exportService } = context;
 
   const result = await exportService.listSnapshots(args.build_name, {
@@ -144,6 +152,7 @@ export async function handleListSnapshots(
       },
     ],
   };
+  });
 }
 
 export async function handleRestoreSnapshot(
@@ -154,6 +163,7 @@ export async function handleRestoreSnapshot(
     backup_current?: boolean;
   }
 ) {
+  return wrapHandler('restore snapshot', async () => {
   const { exportService, buildService } = context;
 
   const result = await exportService.restoreSnapshot({
@@ -178,9 +188,11 @@ export async function handleRestoreSnapshot(
       },
     ],
   };
+  });
 }
 
 export async function handleExportBuildSummary(context: ExportContext) {
+  return wrapHandler('export build summary', async () => {
   const luaClient = context.luaClient;
   if (!luaClient) throw new Error('Lua bridge not active. Use lua_load_build first.');
 
@@ -249,4 +261,5 @@ export async function handleExportBuildSummary(context: ExportContext) {
   output += `---\n_Generated with pob-mcp-server_\n`;
 
   return { content: [{ type: 'text' as const, text: output }] };
+  });
 }

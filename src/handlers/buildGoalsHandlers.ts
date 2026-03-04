@@ -1,5 +1,6 @@
 import type { PoBLuaApiClient } from "../pobLuaBridge.js";
 import type { BuildIssue } from "../types.js";
+import { wrapHandler } from "../utils/errorHandling.js";
 
 export interface BuildGoalsHandlerContext {
   getLuaClient: () => PoBLuaApiClient | null;
@@ -18,57 +19,59 @@ const ISSUES_FIELDS = [
 ];
 
 export async function handleGetBuildIssues(context: BuildGoalsHandlerContext) {
-  await context.ensureLuaClient();
-  const luaClient = context.getLuaClient();
-  if (!luaClient) throw new Error('Lua bridge not active. Use lua_start and lua_load_build first.');
+  return wrapHandler('get build issues', async () => {
+    await context.ensureLuaClient();
+    const luaClient = context.getLuaClient();
+    if (!luaClient) throw new Error('Lua bridge not active. Use lua_start and lua_load_build first.');
 
-  const stats = await luaClient.getStats(ISSUES_FIELDS);
-  const issues: BuildIssue[] = [];
+    const stats = await luaClient.getStats(ISSUES_FIELDS);
+    const issues: BuildIssue[] = [];
 
-  // Elemental resistances
-  for (const r of ['Fire', 'Cold', 'Lightning'] as const) {
-    const val = (stats[`${r}Resist`] as number) ?? 0;
-    if (val < 0) {
-      issues.push({ severity: 'error', category: 'resistance', message: `${r} resist is ${val}% (negative)` });
-    } else if (val < 75) {
-      issues.push({ severity: 'warning', category: 'resistance', message: `${r} resist ${val}% — ${75 - val}% short of cap` });
+    // Elemental resistances
+    for (const r of ['Fire', 'Cold', 'Lightning'] as const) {
+      const val = (stats[`${r}Resist`] as number) ?? 0;
+      if (val < 0) {
+        issues.push({ severity: 'error', category: 'resistance', message: `${r} resist is ${val}% (negative)` });
+      } else if (val < 75) {
+        issues.push({ severity: 'warning', category: 'resistance', message: `${r} resist ${val}% — ${75 - val}% short of cap` });
+      }
+      const over = (stats[`${r}ResistOverCap`] as number) ?? 0;
+      if (over > 0) {
+        issues.push({ severity: 'info', category: 'resistance', message: `${r} resist ${over}% over max cap (wasted)` });
+      }
     }
-    const over = (stats[`${r}ResistOverCap`] as number) ?? 0;
-    if (over > 0) {
-      issues.push({ severity: 'info', category: 'resistance', message: `${r} resist ${over}% over max cap (wasted)` });
+
+    const chaos = (stats.ChaosResist as number) ?? 0;
+    if (chaos < 0) {
+      issues.push({ severity: 'warning', category: 'resistance', message: `Chaos resist is ${chaos}%` });
     }
-  }
 
-  const chaos = (stats.ChaosResist as number) ?? 0;
-  if (chaos < 0) {
-    issues.push({ severity: 'warning', category: 'resistance', message: `Chaos resist is ${chaos}%` });
-  }
+    // Health pools
+    const life = (stats.Life as number) ?? 0;
+    const es = (stats.EnergyShield as number) ?? 0;
+    if (life < 500 && es < 500) {
+      issues.push({ severity: 'warning', category: 'survivability', message: `Low health pool — Life: ${life}, ES: ${es}` });
+    }
 
-  // Health pools
-  const life = (stats.Life as number) ?? 0;
-  const es = (stats.EnergyShield as number) ?? 0;
-  if (life < 500 && es < 500) {
-    issues.push({ severity: 'warning', category: 'survivability', message: `Low health pool — Life: ${life}, ES: ${es}` });
-  }
+    // Reservation checks
+    const lifeUnreserved = (stats.LifeUnreserved as number) ?? life;
+    if (lifeUnreserved <= 0) {
+      issues.push({ severity: 'error', category: 'reservation', message: 'Unreserved life is 0 or negative' });
+    }
 
-  // Reservation checks
-  const lifeUnreserved = (stats.LifeUnreserved as number) ?? life;
-  if (lifeUnreserved <= 0) {
-    issues.push({ severity: 'error', category: 'reservation', message: 'Unreserved life is 0 or negative' });
-  }
+    const manaUnreserved = (stats.ManaUnreserved as number) ?? 0;
+    if (manaUnreserved < 0) {
+      issues.push({ severity: 'error', category: 'reservation', message: `Mana over-reserved by ${Math.abs(manaUnreserved)}` });
+    }
 
-  const manaUnreserved = (stats.ManaUnreserved as number) ?? 0;
-  if (manaUnreserved < 0) {
-    issues.push({ severity: 'error', category: 'reservation', message: `Mana over-reserved by ${Math.abs(manaUnreserved)}` });
-  }
+    // Spell suppression (only flag if build has any invested; use effective value for cap check)
+    const supp = (stats.EffectiveSpellSuppressionChance as number) ?? (stats.SpellSuppressionChance as number) ?? 0;
+    if (supp > 0 && supp < 100) {
+      issues.push({ severity: 'info', category: 'defence', message: `Spell suppression ${supp}% — not capped at 100%` });
+    }
 
-  // Spell suppression (only flag if build has any invested; use effective value for cap check)
-  const supp = (stats.EffectiveSpellSuppressionChance as number) ?? (stats.SpellSuppressionChance as number) ?? 0;
-  if (supp > 0 && supp < 100) {
-    issues.push({ severity: 'info', category: 'defence', message: `Spell suppression ${supp}% — not capped at 100%` });
-  }
-
-  return { issues, stats };
+    return { issues, stats };
+  });
 }
 
 export function formatIssuesResponse(issues: BuildIssue[], stats: Record<string, any>) {

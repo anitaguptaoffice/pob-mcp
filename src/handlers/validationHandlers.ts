@@ -3,6 +3,7 @@ import type { ValidationService } from "../services/validationService.js";
 import type { PoBLuaApiClient } from "../pobLuaBridge.js";
 import fs from "fs/promises";
 import path from "path";
+import { wrapHandler } from "../utils/errorHandling.js";
 
 export interface ValidationHandlerContext {
   buildService: BuildService;
@@ -19,6 +20,7 @@ export async function handleValidateBuild(
   context: ValidationHandlerContext,
   args?: { build_name?: string }
 ) {
+  return wrapHandler('validate build', async () => {
   const { buildService, validationService, getLuaClient, ensureLuaClient } = context;
 
   let buildData;
@@ -146,6 +148,7 @@ export async function handleValidateBuild(
       },
     ],
   };
+  });
 }
 
 /**

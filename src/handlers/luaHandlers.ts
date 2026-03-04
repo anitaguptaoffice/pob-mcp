@@ -2,6 +2,7 @@ import type { PoBLuaApiClient } from "../pobLuaBridge.js";
 import { handleGetBuildIssues } from "./buildGoalsHandlers.js";
 import fs from "fs/promises";
 import path from "path";
+import { wrapHandler } from "../utils/errorHandling.js";
 
 export interface LuaHandlerContext {
   pobDirectory: string;
@@ -12,7 +13,7 @@ export interface LuaHandlerContext {
 }
 
 export async function handleLuaStart(context: LuaHandlerContext) {
-  try {
+  return wrapHandler('start Lua bridge', async () => {
     await context.ensureLuaClient();
 
     return {
@@ -23,27 +24,26 @@ export async function handleLuaStart(context: LuaHandlerContext) {
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(errorMsg);
-  }
+  });
 }
 
 export async function handleLuaStop(context: LuaHandlerContext) {
-  await context.stopLuaClient();
+  return wrapHandler('stop Lua bridge', async () => {
+    await context.stopLuaClient();
 
-  return {
-    content: [
-      {
-        type: "text" as const,
-        text: "PoB Lua Bridge stopped successfully.",
-      },
-    ],
-  };
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: "PoB Lua Bridge stopped successfully.",
+        },
+      ],
+    };
+  });
 }
 
 export async function handleLuaNewBuild(context: LuaHandlerContext, className?: string, ascendancy?: string) {
-  try {
+  return wrapHandler('create new build', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -62,14 +62,11 @@ export async function handleLuaNewBuild(context: LuaHandlerContext, className?: 
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to create new build: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleLuaSaveBuild(context: LuaHandlerContext, buildName: string) {
-  try {
+  return wrapHandler('save build', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -93,10 +90,7 @@ export async function handleLuaSaveBuild(context: LuaHandlerContext, buildName: 
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to save build: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleLuaLoadBuild(
@@ -105,7 +99,7 @@ export async function handleLuaLoadBuild(
   buildXml?: string,
   name?: string
 ) {
-  try {
+  return wrapHandler('load build', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -129,34 +123,37 @@ export async function handleLuaLoadBuild(
     await luaClient.loadBuildXml(xml, name);
 
     // Check for multiple specs / item sets and inform the user (sequential — bridge is single-request)
-    let extra = '';
+    const extraLines: string[] = [];
     try {
       const specsResult = await luaClient.listSpecs();
       const itemSetsResult = await luaClient.listItemSets();
       if (specsResult?.specs?.length > 1) {
-        extra += `\n\n📋 This build has ${specsResult.specs.length} passive tree specs:`;
+        extraLines.push('');
+        extraLines.push(`📋 This build has ${specsResult.specs.length} passive tree specs:`);
         for (const s of specsResult.specs) {
-          extra += `\n  ${s.active ? '▶' : ' '} [${s.index}] ${s.title} — ${s.className}/${s.ascendClassName}, ${s.nodeCount} nodes`;
+          extraLines.push(`  ${s.active ? '▶' : ' '} [${s.index}] ${s.title} — ${s.className}/${s.ascendClassName}, ${s.nodeCount} nodes`);
         }
-        extra += `\n\nUse select_spec to switch specs.`;
+        extraLines.push('Use select_spec to switch specs.');
       }
       if (itemSetsResult?.itemSets?.length > 1) {
-        extra += `\n\n🎒 This build has ${itemSetsResult.itemSets.length} item sets:`;
+        extraLines.push('');
+        extraLines.push(`🎒 This build has ${itemSetsResult.itemSets.length} item sets:`);
         for (const s of itemSetsResult.itemSets) {
-          extra += `\n  ${s.active ? '▶' : ' '} [${s.id}] ${s.title}`;
+          extraLines.push(`  ${s.active ? '▶' : ' '} [${s.id}] ${s.title}`);
         }
-        extra += `\n\nUse select_item_set to switch item sets.`;
+        extraLines.push('Use select_item_set to switch item sets.');
       }
     } catch {
       // Non-fatal: spec/item set info is advisory only
     }
+    const extra = extraLines.length > 0 ? '\n' + extraLines.join('\n') : '';
 
     // Auto-context: fetch stats + top issues after successful load (sequential — bridge is single-request)
-    let summary = '';
+    const summaryLines: string[] = [];
     try {
       const info = await luaClient.getBuildInfo().catch(() => null);
       if (info) {
-        summary += `\n**${info.name || name}** | Level ${info.level} ${info.class}${info.ascendancy ? ` (${info.ascendancy})` : ''}\n`;
+        summaryLines.push(`**${info.name || name}** | Level ${info.level} ${info.class}${info.ascendancy ? ` (${info.ascendancy})` : ''}`);
       }
 
       const s = await luaClient.getStats(['Life', 'TotalDPS', 'CombinedDPS', 'MinionTotalDPS',
@@ -164,8 +161,8 @@ export async function handleLuaLoadBuild(
       if (s) {
         const dps = Number(s.CombinedDPS || s.TotalDPS || s.MinionTotalDPS || 0);
         const dpsLabel = (s.MinionTotalDPS && !s.TotalDPS) ? 'Minion DPS' : 'DPS';
-        summary += `Life: ${Number(s.Life ?? 0).toLocaleString()} | ${dpsLabel}: ${Math.round(dps).toLocaleString()} | EHP: ${Number(s.TotalEHP ?? 0).toLocaleString()}\n`;
-        summary += `Resists: F${s.FireResist}% C${s.ColdResist}% L${s.LightningResist}% Ch${s.ChaosResist}%\n`;
+        summaryLines.push(`Life: ${Number(s.Life ?? 0).toLocaleString()} | ${dpsLabel}: ${Math.round(dps).toLocaleString()} | EHP: ${Number(s.TotalEHP ?? 0).toLocaleString()}`);
+        summaryLines.push(`Resists: F${s.FireResist}% C${s.ColdResist}% L${s.LightningResist}% Ch${s.ChaosResist}%`);
       }
 
       const issuesResult = await handleGetBuildIssues({ getLuaClient: context.getLuaClient, ensureLuaClient: async () => {} }).catch(() => null);
@@ -173,16 +170,19 @@ export async function handleLuaLoadBuild(
         const { issues } = issuesResult;
         const topIssues = issues.filter((i: any) => i.severity === 'error' || i.severity === 'warning').slice(0, 3);
         if (topIssues.length > 0) {
-          summary += '\n**Top Issues:**\n';
+          summaryLines.push('');
+          summaryLines.push('**Top Issues:**');
           for (const issue of topIssues) {
             const icon = issue.severity === 'error' ? '🔴' : '🟡';
-            summary += `  ${icon} ${issue.message}\n`;
+            summaryLines.push(`  ${icon} ${issue.message}`);
           }
         } else {
-          summary += '\n✅ No critical issues detected.\n';
+          summaryLines.push('');
+          summaryLines.push('✅ No critical issues detected.');
         }
       }
     } catch { /* auto-context is best-effort */ }
+    const summary = summaryLines.join('\n');
 
     const loadText = `✅ Build "${name || 'MCP Build'}" loaded.${extra}` + (summary ? '\n---\n' + summary : '');
 
@@ -194,14 +194,11 @@ export async function handleLuaLoadBuild(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to load build: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleLuaGetStats(context: LuaHandlerContext, category?: string) {
-  try {
+  return wrapHandler('get stats', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -240,7 +237,7 @@ export async function handleLuaGetStats(context: LuaHandlerContext, category?: s
 
     const stats = await luaClient.getStats(fields);
 
-    let text = "=== PoB Calculated Stats ===\n\n";
+    const textLines: string[] = ['=== PoB Calculated Stats ===', ''];
 
     if (stats && typeof stats === 'object') {
       // Filter out zero/null/undefined values to reduce noise
@@ -265,31 +262,31 @@ export async function handleLuaGetStats(context: LuaHandlerContext, category?: s
         const other = entries.filter(([key]) => !offenseAll.some(([ok]) => ok === key) && !defenseAll.some(([dk]) => dk === key));
 
         if (offense.length > 0) {
-          text += "**Offense:**\n";
+          textLines.push('**Offense:**');
           for (const [key, value] of offense) {
-            text += `${key}: ${value}\n`;
+            textLines.push(`${key}: ${value}`);
           }
           if (offenseAll.length > 15) {
-            text += `  ... use category='offense' for full list (+${offenseAll.length - 15} more)\n`;
+            textLines.push(`  ... use category='offense' for full list (+${offenseAll.length - 15} more)`);
           }
-          text += '\n';
+          textLines.push('');
         }
 
         if (defense.length > 0) {
-          text += "**Defense:**\n";
+          textLines.push('**Defense:**');
           for (const [key, value] of defense) {
-            text += `${key}: ${value}\n`;
+            textLines.push(`${key}: ${value}`);
           }
           if (defenseAll.length > 15) {
-            text += `  ... use category='defense' for full list (+${defenseAll.length - 15} more)\n`;
+            textLines.push(`  ... use category='defense' for full list (+${defenseAll.length - 15} more)`);
           }
-          text += '\n';
+          textLines.push('');
         }
 
         if (other.length > 0 && other.length < 10) {
-          text += "**Other:**\n";
+          textLines.push('**Other:**');
           for (const [key, value] of other) {
-            text += `${key}: ${value}\n`;
+            textLines.push(`${key}: ${value}`);
           }
         }
       } else {
@@ -298,17 +295,19 @@ export async function handleLuaGetStats(context: LuaHandlerContext, category?: s
         let shown = 0;
         for (const [key, value] of entries) {
           if (shown >= maxStats) break;
-          text += `${key}: ${value}\n`;
+          textLines.push(`${key}: ${value}`);
           shown++;
         }
 
         if (entries.length > maxStats) {
-          text += `\n... and ${entries.length - maxStats} more stats\n`;
+          textLines.push('');
+          textLines.push(`... and ${entries.length - maxStats} more stats`);
         }
       }
     } else {
-      text += "No stats available.\n";
+      textLines.push('No stats available.');
     }
+    const text = textLines.join('\n');
 
     return {
       content: [
@@ -318,14 +317,11 @@ export async function handleLuaGetStats(context: LuaHandlerContext, category?: s
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to get stats: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleLuaGetTree(context: LuaHandlerContext, includeNodeIds?: boolean) {
-  try {
+  return wrapHandler('get passive tree', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -335,33 +331,34 @@ export async function handleLuaGetTree(context: LuaHandlerContext, includeNodeId
 
     const tree = await luaClient.getTree();
 
-    let text = "=== PoB Passive Tree ===\n\n";
+    const textLines: string[] = ['=== PoB Passive Tree ===', ''];
 
     if (tree && typeof tree === 'object') {
-      text += `Tree Version: ${tree.treeVersion ?? 'Unknown'}\n`;
-      text += `Class ID: ${tree.classId != null ? tree.classId : 'Unknown'}\n`;
-      text += `Ascendancy ID: ${tree.ascendClassId != null ? tree.ascendClassId : 'Unknown'}\n`;
+      textLines.push(`Tree Version: ${tree.treeVersion ?? 'Unknown'}`);
+      textLines.push(`Class ID: ${tree.classId != null ? tree.classId : 'Unknown'}`);
+      textLines.push(`Ascendancy ID: ${tree.ascendClassId != null ? tree.ascendClassId : 'Unknown'}`);
 
       if (tree.secondaryAscendClassId) {
-        text += `Secondary Ascendancy ID: ${tree.secondaryAscendClassId}\n`;
+        textLines.push(`Secondary Ascendancy ID: ${tree.secondaryAscendClassId}`);
       }
 
       if (tree.nodes && Array.isArray(tree.nodes)) {
-        text += `\nAllocated Nodes: ${tree.nodes.length} nodes\n`;
+        textLines.push(`\nAllocated Nodes: ${tree.nodes.length} nodes`);
         if (includeNodeIds) {
-          text += `Node IDs: ${tree.nodes.join(', ')}\n`;
+          textLines.push(`Node IDs: ${tree.nodes.join(', ')}`);
         } else {
-          text += `Node IDs: [omitted — use include_node_ids=true to see full list]\n`;
+          textLines.push(`Node IDs: [omitted — use include_node_ids=true to see full list]`);
         }
       }
 
       if (tree.masteryEffects && typeof tree.masteryEffects === 'object') {
         const effectCount = Object.keys(tree.masteryEffects).length;
-        text += `\nMastery Effects: ${effectCount} selected\n`;
+        textLines.push(`\nMastery Effects: ${effectCount} selected`);
       }
     } else {
-      text += "No tree data available.\n";
+      textLines.push('No tree data available.');
     }
+    const text = textLines.join('\n');
 
     return {
       content: [
@@ -371,14 +368,11 @@ export async function handleLuaGetTree(context: LuaHandlerContext, includeNodeId
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to get tree: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleLuaSetTree(context: LuaHandlerContext, args: any) {
-  try {
+  return wrapHandler('set passive tree', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -430,14 +424,11 @@ export async function handleLuaSetTree(context: LuaHandlerContext, args: any) {
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to set tree: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleLuaGetBuildInfo(context: LuaHandlerContext) {
-  try {
+  return wrapHandler('get build info', async () => {
     await context.ensureLuaClient();
     const luaClient = context.getLuaClient();
     if (!luaClient) throw new Error('Lua client not initialized');
@@ -450,24 +441,24 @@ export async function handleLuaGetBuildInfo(context: LuaHandlerContext) {
       };
     }
 
-    let text = "=== Build Info ===\n\n";
-    text += `Name: ${info.name || 'Unnamed'}\n`;
-    text += `Level: ${info.level ?? 'Unknown'}\n`;
-    text += `Class: ${info.className || 'Unknown'}\n`;
-    text += `Ascendancy: ${info.ascendClassName || 'None'}\n`;
-    text += `Tree Version: ${info.treeVersion || 'Unknown'}\n`;
+    const text = [
+      '=== Build Info ===',
+      '',
+      `Name: ${info.name || 'Unnamed'}`,
+      `Level: ${info.level ?? 'Unknown'}`,
+      `Class: ${info.className || 'Unknown'}`,
+      `Ascendancy: ${info.ascendClassName || 'None'}`,
+      `Tree Version: ${info.treeVersion || 'Unknown'}`,
+    ].join('\n');
 
     return {
       content: [{ type: "text" as const, text }],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to get build info: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleLuaReloadBuild(context: LuaHandlerContext, buildName?: string) {
-  try {
+  return wrapHandler('reload build', async () => {
     await context.ensureLuaClient();
     const luaClient = context.getLuaClient();
     if (!luaClient) throw new Error('Lua client not initialized');
@@ -492,14 +483,11 @@ export async function handleLuaReloadBuild(context: LuaHandlerContext, buildName
     return {
       content: [{ type: "text" as const, text: `✅ Build "${fileName}" reloaded from disk.` }],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to reload build: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleUpdateTreeDelta(context: LuaHandlerContext, addNodes?: string[], removeNodes?: string[]) {
-  try {
+  return wrapHandler('update tree delta', async () => {
     await context.ensureLuaClient();
     const luaClient = context.getLuaClient();
     if (!luaClient) throw new Error('Lua client not initialized');
@@ -530,10 +518,7 @@ export async function handleUpdateTreeDelta(context: LuaHandlerContext, addNodes
     return {
       content: [{ type: "text" as const, text }],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to apply tree delta: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleSearchTreeNodes(
@@ -543,7 +528,7 @@ export async function handleSearchTreeNodes(
   maxResults?: number,
   includeAllocated?: boolean
 ) {
-  try {
+  return wrapHandler('search tree nodes', async () => {
     await context.ensureLuaClient();
 
     const luaClient = context.getLuaClient();
@@ -565,52 +550,54 @@ export async function handleSearchTreeNodes(
       includeAllocated,
     });
 
-    let text = "=== Passive Tree Node Search ===\n\n";
-    text += `Searching for: "${keyword}"\n`;
+    const textLines: string[] = ['=== Passive Tree Node Search ===', ''];
+    textLines.push(`Searching for: "${keyword}"`);
     if (nodeType) {
-      text += `Node type filter: ${nodeType}\n`;
+      textLines.push(`Node type filter: ${nodeType}`);
     }
-    text += `\n`;
+    textLines.push('');
 
     if (!results.nodes || results.nodes.length === 0) {
-      text += "No matching nodes found.\n\n";
-      text += "Tips:\n";
-      text += "- Try a shorter or more general keyword\n";
-      text += "- Check spelling\n";
-      text += "- Remove the node type filter to see more results\n";
+      textLines.push('No matching nodes found.', '');
+      textLines.push('Tips:');
+      textLines.push('- Try a shorter or more general keyword');
+      textLines.push('- Check spelling');
+      textLines.push('- Remove the node type filter to see more results');
     } else {
-      text += `Found ${results.count} matching node${results.count === 1 ? '' : 's'}`;
+      let countLine = `Found ${results.count} matching node${results.count === 1 ? '' : 's'}`;
       if (results.count >= effectiveMaxResults) {
-        text += ` (showing top ${effectiveMaxResults})`;
+        countLine += ` (showing top ${effectiveMaxResults})`;
       }
-      text += `:\n\n`;
+      countLine += ':';
+      textLines.push(countLine, '');
 
       for (const node of results.nodes) {
         const allocatedTag = node.allocated ? " [ALLOCATED]" : "";
         const typeTag = node.type !== 'normal' ? ` [${node.type.toUpperCase()}]` : "";
 
-        text += `**${node.name}**${typeTag}${allocatedTag}\n`;
-        text += `  Node ID: ${node.id}\n`;
+        textLines.push(`**${node.name}**${typeTag}${allocatedTag}`);
+        textLines.push(`  Node ID: ${node.id}`);
 
         if (node.ascendancyName) {
-          text += `  Ascendancy: ${node.ascendancyName}\n`;
+          textLines.push(`  Ascendancy: ${node.ascendancyName}`);
         }
 
         if (node.stats && node.stats.length > 0) {
           // Limit to first 3 stats to reduce response size
           const statsToShow = node.stats.slice(0, 3);
-          text += `  Stats:\n`;
+          textLines.push('  Stats:');
           for (const stat of statsToShow) {
-            text += `    - ${stat}\n`;
+            textLines.push(`    - ${stat}`);
           }
           if (node.stats.length > 3) {
-            text += `    - ... and ${node.stats.length - 3} more\n`;
+            textLines.push(`    - ... and ${node.stats.length - 3} more`);
           }
         }
 
-        text += `\n`;
+        textLines.push('');
       }
     }
+    const text = textLines.join('\n');
 
     return {
       content: [
@@ -620,13 +607,11 @@ export async function handleSearchTreeNodes(
         },
       ],
     };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to search nodes: ${errorMsg}`);
-  }
+  });
 }
 
 export async function handleListSpecs(context: LuaHandlerContext) {
+  return wrapHandler('list specs', async () => {
   await context.ensureLuaClient();
   const luaClient = context.getLuaClient();
   if (!luaClient) throw new Error('Lua client not initialized');
@@ -634,17 +619,20 @@ export async function handleListSpecs(context: LuaHandlerContext) {
   if (!result?.specs?.length) {
     return { content: [{ type: "text" as const, text: "No specs found. Load a build first." }] };
   }
-  let text = `=== Passive Tree Specs (${result.specs.length} total) ===\n\n`;
+  const textLines: string[] = [`=== Passive Tree Specs (${result.specs.length} total) ===`, ''];
   for (const s of result.specs) {
-    text += `${s.active ? '▶' : ' '} [${s.index}] ${s.title}\n`;
-    text += `      Class: ${s.className || 'Unknown'} / ${s.ascendClassName || 'None'}\n`;
-    text += `      Nodes: ${s.nodeCount}  |  Tree: ${s.treeVersion || 'Unknown'}\n`;
+    textLines.push(`${s.active ? '▶' : ' '} [${s.index}] ${s.title}`);
+    textLines.push(`      Class: ${s.className || 'Unknown'} / ${s.ascendClassName || 'None'}`);
+    textLines.push(`      Nodes: ${s.nodeCount}  |  Tree: ${s.treeVersion || 'Unknown'}`);
   }
-  text += `\nActive: Spec ${result.activeSpec}. Use select_spec to switch.`;
+  textLines.push(`\nActive: Spec ${result.activeSpec}. Use select_spec to switch.`);
+  const text = textLines.join('\n');
   return { content: [{ type: "text" as const, text }] };
+  });
 }
 
 export async function handleSelectSpec(context: LuaHandlerContext, index: number) {
+  return wrapHandler('select spec', async () => {
   await context.ensureLuaClient();
   const luaClient = context.getLuaClient();
   if (!luaClient) throw new Error('Lua client not initialized');
@@ -654,9 +642,11 @@ export async function handleSelectSpec(context: LuaHandlerContext, index: number
   if (active) text += ` — ${active.title} (${active.className}/${active.ascendClassName}, ${active.nodeCount} nodes)`;
   text += `.\n\nStats have been recalculated for this spec.`;
   return { content: [{ type: "text" as const, text }] };
+  });
 }
 
 export async function handleListItemSets(context: LuaHandlerContext) {
+  return wrapHandler('list item sets', async () => {
   await context.ensureLuaClient();
   const luaClient = context.getLuaClient();
   if (!luaClient) throw new Error('Lua client not initialized');
@@ -664,17 +654,20 @@ export async function handleListItemSets(context: LuaHandlerContext) {
   if (!result?.itemSets?.length) {
     return { content: [{ type: "text" as const, text: "No item sets found. Load a build first." }] };
   }
-  let text = `=== Item Sets (${result.itemSets.length} total) ===\n\n`;
+  const textLines: string[] = [`=== Item Sets (${result.itemSets.length} total) ===`, ''];
   for (const s of result.itemSets) {
-    text += `${s.active ? '▶' : ' '} [${s.id}] ${s.title}`;
-    if (s.useSecondWeaponSet) text += ` (swap weapon set)`;
-    text += `\n`;
+    let line = `${s.active ? '▶' : ' '} [${s.id}] ${s.title}`;
+    if (s.useSecondWeaponSet) line += ` (swap weapon set)`;
+    textLines.push(line);
   }
-  text += `\nActive: Item Set ${result.activeItemSetId}. Use select_item_set to switch.`;
+  textLines.push(`\nActive: Item Set ${result.activeItemSetId}. Use select_item_set to switch.`);
+  const text = textLines.join('\n');
   return { content: [{ type: "text" as const, text }] };
+  });
 }
 
 export async function handleSelectItemSet(context: LuaHandlerContext, id: number) {
+  return wrapHandler('select item set', async () => {
   await context.ensureLuaClient();
   const luaClient = context.getLuaClient();
   if (!luaClient) throw new Error('Lua client not initialized');
@@ -684,4 +677,5 @@ export async function handleSelectItemSet(context: LuaHandlerContext, id: number
   if (active) text += ` — ${active.title}`;
   text += `.\n\nStats have been recalculated for this item set.`;
   return { content: [{ type: "text" as const, text }] };
+  });
 }

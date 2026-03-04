@@ -141,9 +141,13 @@ export async function handleGetNearbyNodes(
       };
     }
 
-    let text = `=== Nearby Nodes (within ${distance} nodes) ===\n\n`;
-    text += `Build: ${buildName}\n`;
-    text += `Found ${nearbyNodes.length} nodes\n\n`;
+    const textLines: string[] = [
+      `=== Nearby Nodes (within ${distance} nodes) ===`,
+      '',
+      `Build: ${buildName}`,
+      `Found ${nearbyNodes.length} nodes`,
+      '',
+    ];
 
     // Group by distance
     const byDistance = new Map<number, typeof nearbyNodes>();
@@ -153,27 +157,27 @@ export async function handleGetNearbyNodes(
       byDistance.set(node.distance, existing);
     }
 
-    for (const [distance, nodes] of Array.from(byDistance.entries()).sort((a, b) => a[0] - b[0])) {
-      text += `**Distance ${distance}** (${nodes.length} nodes):\n`;
+    for (const [dist, nodes] of Array.from(byDistance.entries()).sort((a, b) => a[0] - b[0])) {
+      textLines.push(`**Distance ${dist}** (${nodes.length} nodes):`);
       for (const { node, nodeId } of nodes.slice(0, 10)) {
-        text += `- ${node.name || 'Unnamed'} [${nodeId}]`;
-        if (node.isKeystone) text += ' (KEYSTONE)';
-        text += '\n';
+        let line = `- ${node.name || 'Unnamed'} [${nodeId}]`;
+        if (node.isKeystone) line += ' (KEYSTONE)';
+        textLines.push(line);
         if (node.stats && node.stats.length > 0) {
-          text += `  ${node.stats.slice(0, 2).join('; ')}\n`;
+          textLines.push(`  ${node.stats.slice(0, 2).join('; ')}`);
         }
       }
       if (nodes.length > 10) {
-        text += `  ... and ${nodes.length - 10} more\n`;
+        textLines.push(`  ... and ${nodes.length - 10} more`);
       }
-      text += '\n';
+      textLines.push('');
     }
 
     return {
       content: [
         {
           type: "text" as const,
-          text,
+          text: textLines.join('\n'),
         },
       ],
     };
@@ -247,22 +251,25 @@ export async function handleFindPath(
     }
 
     // Format output
-    let text = `=== Path to ${targetNode.name || "Node " + targetNodeId} ===\n\n`;
-    text += `Build: ${buildName}\n`;
-    text += `Target: ${targetNode.name || "Unknown"} [${targetNodeId}]\n`;
-    if (targetNode.isKeystone) text += `Type: KEYSTONE\n`;
-    else if (targetNode.isNotable) text += `Type: Notable\n`;
-    text += `\n`;
+    const textLines: string[] = [
+      `=== Path to ${targetNode.name || "Node " + targetNodeId} ===`,
+      '',
+      `Build: ${buildName}`,
+      `Target: ${targetNode.name || "Unknown"} [${targetNodeId}]`,
+    ];
+    if (targetNode.isKeystone) textLines.push('Type: KEYSTONE');
+    else if (targetNode.isNotable) textLines.push('Type: Notable');
+    textLines.push('');
 
     for (let i = 0; i < paths.length; i++) {
       const path = paths[i];
       const pathLabel = paths.length > 1 ? `Path ${i + 1} (Alternative ${i === 0 ? "- Shortest" : i})` : "Shortest Path";
 
-      text += `**${pathLabel}**\n`;
-      text += `Total Cost: ${path.cost} passive points\n`;
-      text += `Nodes to Allocate: ${path.nodes.length}\n\n`;
+      textLines.push(`**${pathLabel}**`);
+      textLines.push(`Total Cost: ${path.cost} passive points`);
+      textLines.push(`Nodes to Allocate: ${path.nodes.length}`, '');
 
-      text += `Allocation Order:\n`;
+      textLines.push('Allocation Order:');
       for (let j = 0; j < path.nodes.length; j++) {
         const nodeId = path.nodes[j];
         const node = treeData.nodes.get(nodeId);
@@ -271,30 +278,30 @@ export async function handleFindPath(
         const isTarget = nodeId === targetNodeId;
         const prefix = isTarget ? "→ TARGET: " : `  ${j + 1}. `;
 
-        text += `${prefix}${node.name || "Travel Node"} [${nodeId}]\n`;
+        textLines.push(`${prefix}${node.name || "Travel Node"} [${nodeId}]`);
 
         if (node.stats && node.stats.length > 0) {
           for (const stat of node.stats) {
-            text += `      ${stat}\n`;
+            textLines.push(`      ${stat}`);
           }
         } else if (!isTarget) {
-          text += `      (Travel node - no stats)\n`;
+          textLines.push('      (Travel node - no stats)');
         }
 
-        if (j < path.nodes.length - 1) text += `\n`;
+        if (j < path.nodes.length - 1) textLines.push('');
       }
 
-      if (i < paths.length - 1) text += `\n${"=".repeat(50)}\n\n`;
+      if (i < paths.length - 1) textLines.push('', '='.repeat(50), '');
     }
 
-    text += `\n**Next Steps:**\n`;
-    text += `Use lua_set_tree to allocate these nodes and recalculate stats.\n`;
+    textLines.push('', '**Next Steps:**');
+    textLines.push('Use lua_set_tree to allocate these nodes and recalculate stats.');
 
     return {
       content: [
         {
           type: "text" as const,
-          text,
+          text: textLines.join('\n'),
         },
       ],
     };
@@ -418,33 +425,37 @@ export async function handleGetPassiveUpgrades(
   scored.sort((a, b) => b.score - a.score);
   const top = scored.slice(0, maxResults);
 
-  let text = `=== Passive Upgrades (focus: ${focus}) ===\n\n`;
-  text += `Base DPS: ${Math.round(baseDPS).toLocaleString()}  |  Base EHP: ${Math.round(baseEHP).toLocaleString()}\n`;
-  text += `Evaluated ${candidates.length} candidate notables, showing top ${top.length}:\n\n`;
+  const textLines: string[] = [
+    `=== Passive Upgrades (focus: ${focus}) ===`,
+    '',
+    `Base DPS: ${Math.round(baseDPS).toLocaleString()}  |  Base EHP: ${Math.round(baseEHP).toLocaleString()}`,
+    `Evaluated ${candidates.length} candidate notables, showing top ${top.length}:`,
+    '',
+  ];
 
   for (let i = 0; i < top.length; i++) {
     const { node, dpsDelta, ehpDelta, score } = top[i];
-    text += `${i + 1}. **${node.name}** [${node.id}]\n`;
-    text += `   Score: ${score.toFixed(4)}`;
-    if (dpsDelta !== 0) text += `  |  DPS Δ: ${dpsDelta > 0 ? '+' : ''}${Math.round(dpsDelta).toLocaleString()}`;
-    if (ehpDelta !== 0) text += `  |  EHP Δ: ${ehpDelta > 0 ? '+' : ''}${Math.round(ehpDelta).toLocaleString()}`;
-    text += '\n';
+    textLines.push(`${i + 1}. **${node.name}** [${node.id}]`);
+    let scoreLine = `   Score: ${score.toFixed(4)}`;
+    if (dpsDelta !== 0) scoreLine += `  |  DPS Δ: ${dpsDelta > 0 ? '+' : ''}${Math.round(dpsDelta).toLocaleString()}`;
+    if (ehpDelta !== 0) scoreLine += `  |  EHP Δ: ${ehpDelta > 0 ? '+' : ''}${Math.round(ehpDelta).toLocaleString()}`;
+    textLines.push(scoreLine);
     if (node.stats && node.stats.length > 0) {
       for (const stat of (node.stats as string[]).slice(0, 2)) {
-        text += `   - ${stat}\n`;
+        textLines.push(`   - ${stat}`);
       }
     }
-    text += '\n';
+    textLines.push('');
   }
 
   if (top.length === 0) {
-    text += 'No results after simulation. Try a different focus or ensure a build is loaded.\n';
+    textLines.push('No results after simulation. Try a different focus or ensure a build is loaded.');
   } else {
-    text += `\n💡 Use lua_set_tree to allocate the top node and recalculate stats.\n`;
+    textLines.push('', '💡 Use lua_set_tree to allocate the top node and recalculate stats.');
   }
 
   return {
-    content: [{ type: 'text' as const, text }],
+    content: [{ type: 'text' as const, text: textLines.join('\n') }],
   };
 }
 
@@ -481,15 +492,15 @@ export async function handleSuggestMasteries(context: PassiveUpgradesContext) {
     }
   }
 
-  let output = '=== Mastery Node Suggestions ===\n\n';
+  const outputLines: string[] = ['=== Mastery Node Suggestions ===', ''];
 
   for (const mastery of masteries) {
-    output += `**${mastery.nodeName}** (node ${mastery.nodeId})\n`;
+    outputLines.push(`**${mastery.nodeName}** (node ${mastery.nodeId})`);
     if (mastery.allocatedEffect != null) {
       const current = mastery.availableEffects.find((e: any) => e.effectId === mastery.allocatedEffect);
-      output += `  Current: ${current?.stat ?? mastery.allocatedEffect}\n`;
+      outputLines.push(`  Current: ${current?.stat ?? mastery.allocatedEffect}`);
     } else {
-      output += `  Current: (none selected)\n`;
+      outputLines.push('  Current: (none selected)');
     }
 
     // Simulate each effect choice
@@ -513,89 +524,94 @@ export async function handleSuggestMasteries(context: PassiveUpgradesContext) {
       ((a.dpsDelta / baseDPS) + (a.ehpDelta / baseEHP))
     );
     if (scored.length === 0) {
-      output += `  (simulation unavailable for this mastery)\n`;
+      outputLines.push('  (simulation unavailable for this mastery)');
     }
     for (const s of scored.slice(0, 3)) {
       const dpsStr = s.dpsDelta !== 0 ? ` | DPS Delta${s.dpsDelta > 0 ? '+' : ''}${Math.round(s.dpsDelta)}` : '';
       const ehpStr = s.ehpDelta !== 0 ? ` | EHP Delta${s.ehpDelta > 0 ? '+' : ''}${Math.round(s.ehpDelta)}` : '';
-      output += `  - ${s.stat}${dpsStr}${ehpStr}\n`;
+      outputLines.push(`  - ${s.stat}${dpsStr}${ehpStr}`);
     }
-    output += '\n';
+    outputLines.push('');
   }
 
-  return { content: [{ type: 'text' as const, text: output }] };
+  return { content: [{ type: 'text' as const, text: outputLines.join('\n') }] };
 }
 
 // Helper function
 function formatTreeComparison(comparison: TreeComparison): string {
-  let output = `=== Passive Tree Comparison ===\n\n`;
-  output += `Build 1: ${comparison.build1.name}\n`;
-  output += `Build 2: ${comparison.build2.name}\n\n`;
-
-  // Point allocation
-  output += `=== Point Allocation ===\n`;
-  output += `Build 1: ${comparison.build1.analysis.totalPoints} points\n`;
-  output += `Build 2: ${comparison.build2.analysis.totalPoints} points\n`;
-  output += `Difference: ${Math.abs(comparison.differences.pointDifference)} points `;
-  output += comparison.differences.pointDifference > 0 ? '(Build 1 has more)\n' : '(Build 2 has more)\n';
-
-  // Archetype comparison
-  output += `\n=== Archetype Comparison ===\n`;
-  output += `${comparison.differences.archetypeDifference}\n`;
-
-  // Keystones comparison
-  output += `\n=== Keystones Comparison ===\n`;
-  output += `Build 1 Keystones: ${comparison.build1.analysis.keystones.map(k => k.name).join(', ') || 'None'}\n`;
-  output += `Build 2 Keystones: ${comparison.build2.analysis.keystones.map(k => k.name).join(', ') || 'None'}\n`;
+  const lines: string[] = [
+    '=== Passive Tree Comparison ===',
+    '',
+    `Build 1: ${comparison.build1.name}`,
+    `Build 2: ${comparison.build2.name}`,
+    '',
+    '=== Point Allocation ===',
+    `Build 1: ${comparison.build1.analysis.totalPoints} points`,
+    `Build 2: ${comparison.build2.analysis.totalPoints} points`,
+    `Difference: ${Math.abs(comparison.differences.pointDifference)} points ` +
+      (comparison.differences.pointDifference > 0 ? '(Build 1 has more)' : '(Build 2 has more)'),
+    '',
+    '=== Archetype Comparison ===',
+    comparison.differences.archetypeDifference,
+    '',
+    '=== Keystones Comparison ===',
+    `Build 1 Keystones: ${comparison.build1.analysis.keystones.map(k => k.name).join(', ') || 'None'}`,
+    `Build 2 Keystones: ${comparison.build2.analysis.keystones.map(k => k.name).join(', ') || 'None'}`,
+  ];
 
   // Unique keystones
   const uniqueKeystones1 = comparison.differences.uniqueToBuild1.filter(n => n.isKeystone);
   const uniqueKeystones2 = comparison.differences.uniqueToBuild2.filter(n => n.isKeystone);
 
   if (uniqueKeystones1.length > 0) {
-    output += `\nUnique to Build 1:\n`;
+    lines.push('\nUnique to Build 1:');
     for (const ks of uniqueKeystones1) {
-      output += `- ${ks.name}\n`;
+      lines.push(`- ${ks.name}`);
     }
   }
 
   if (uniqueKeystones2.length > 0) {
-    output += `\nUnique to Build 2:\n`;
+    lines.push('\nUnique to Build 2:');
     for (const ks of uniqueKeystones2) {
-      output += `- ${ks.name}\n`;
+      lines.push(`- ${ks.name}`);
     }
   }
 
   // Notables comparison
-  output += `\n=== Notable Passives Comparison ===\n`;
-  output += `Build 1: ${comparison.build1.analysis.notables.length} notables\n`;
-  output += `Build 2: ${comparison.build2.analysis.notables.length} notables\n`;
+  lines.push(
+    '',
+    '=== Notable Passives Comparison ===',
+    `Build 1: ${comparison.build1.analysis.notables.length} notables`,
+    `Build 2: ${comparison.build2.analysis.notables.length} notables`
+  );
 
   const uniqueNotables1 = comparison.differences.uniqueToBuild1.filter(n => n.isNotable);
   const uniqueNotables2 = comparison.differences.uniqueToBuild2.filter(n => n.isNotable);
 
   if (uniqueNotables1.length > 0) {
-    output += `\nTop 5 Unique Notables to Build 1:\n`;
+    lines.push('\nTop 5 Unique Notables to Build 1:');
     for (const notable of uniqueNotables1.slice(0, 5)) {
-      output += `- ${notable.name || 'Unnamed'}\n`;
+      lines.push(`- ${notable.name || 'Unnamed'}`);
     }
   }
 
   if (uniqueNotables2.length > 0) {
-    output += `\nTop 5 Unique Notables to Build 2:\n`;
+    lines.push('\nTop 5 Unique Notables to Build 2:');
     for (const notable of uniqueNotables2.slice(0, 5)) {
-      output += `- ${notable.name || 'Unnamed'}\n`;
+      lines.push(`- ${notable.name || 'Unnamed'}`);
     }
   }
 
   // Pathing efficiency
-  output += `\n=== Pathing Efficiency ===\n`;
-  output += `Build 1: ${comparison.build1.analysis.pathingEfficiency}\n`;
-  output += `Build 2: ${comparison.build2.analysis.pathingEfficiency}\n`;
+  lines.push(
+    '',
+    '=== Pathing Efficiency ===',
+    `Build 1: ${comparison.build1.analysis.pathingEfficiency}`,
+    `Build 2: ${comparison.build2.analysis.pathingEfficiency}`,
+    '',
+    '=== Shared Nodes ===',
+    `${comparison.differences.sharedNodes.length} nodes are allocated in both builds`
+  );
 
-  // Shared nodes
-  output += `\n=== Shared Nodes ===\n`;
-  output += `${comparison.differences.sharedNodes.length} nodes are allocated in both builds\n`;
-
-  return output;
+  return lines.join('\n');
 }

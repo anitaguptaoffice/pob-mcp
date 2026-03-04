@@ -1,6 +1,7 @@
 import type { PoBLuaApiClient } from "../pobLuaBridge.js";
 import fs from 'fs/promises';
 import path from 'path';
+import { wrapHandler } from "../utils/errorHandling.js";
 
 export interface ConfigHandlerContext {
   getLuaClient: () => PoBLuaApiClient | null;
@@ -22,6 +23,7 @@ async function getPresetPath(pobDirectory: string, name: string): Promise<string
 }
 
 export async function handleSaveConfigPreset(context: ConfigPresetContext, name: string) {
+  return wrapHandler('save config preset', async () => {
   await context.ensureLuaClient();
   const luaClient = context.getLuaClient();
   if (!luaClient) throw new Error('Lua bridge not active. Use lua_load_build first.');
@@ -36,9 +38,11 @@ export async function handleSaveConfigPreset(context: ConfigPresetContext, name:
       text: `✅ Config preset "${name}" saved with ${Object.keys(config).length} settings.\nPath: ${filePath}`,
     }],
   };
+  });
 }
 
 export async function handleLoadConfigPreset(context: ConfigPresetContext, name: string) {
+  return wrapHandler('load config preset', async () => {
   await context.ensureLuaClient();
   const luaClient = context.getLuaClient();
   if (!luaClient) throw new Error('Lua bridge not active. Use lua_load_build first.');
@@ -60,9 +64,11 @@ export async function handleLoadConfigPreset(context: ConfigPresetContext, name:
       text: `✅ Config preset "${name}" loaded (${Object.keys(config).length} settings applied).`,
     }],
   };
+  });
 }
 
 export async function handleListConfigPresets(context: ConfigPresetContext) {
+  return wrapHandler('list config presets', async () => {
   const dir = path.join(context.pobDirectory, PRESET_DIR_NAME);
   let files: string[] = [];
   try {
@@ -78,12 +84,14 @@ export async function handleListConfigPresets(context: ConfigPresetContext) {
         : 'No config presets saved yet. Use save_config_preset to create one.',
     }],
   };
+  });
 }
 
 /**
  * Handle get_config tool call
  */
 export async function handleGetConfig(context: ConfigHandlerContext) {
+  return wrapHandler('get config', async () => {
   await context.ensureLuaClient();
   const luaClient = context.getLuaClient();
   if (!luaClient) {
@@ -101,6 +109,7 @@ export async function handleGetConfig(context: ConfigHandlerContext) {
       },
     ],
   };
+  });
 }
 
 /**
@@ -110,6 +119,7 @@ export async function handleSetConfig(
   context: ConfigHandlerContext,
   args: { config_name: string; value: boolean | number | string }
 ) {
+  return wrapHandler('set config', async () => {
   await context.ensureLuaClient();
   const luaClient = context.getLuaClient();
   if (!luaClient) {
@@ -123,18 +133,16 @@ export async function handleSetConfig(
   // Set new value - build params object dynamically
   const params: Record<string, any> = {};
   params[args.config_name] = args.value;
-  const newConfig = await luaClient.setConfig(params);
+  await luaClient.setConfig(params);
 
   // Get updated stats
   const newStats = await luaClient.getStats(['TotalDPS', 'CombinedDPS', 'Life', 'EnergyShield']);
 
-  // Format output
   let output = `=== Configuration Updated ===\n\n`;
   output += `${args.config_name}:\n`;
   output += `  Old Value: ${formatValue(oldValue)}\n`;
   output += `  New Value: ${formatValue(args.value)}\n\n`;
 
-  // Show key stat changes if DPS affected
   if (newStats.TotalDPS) {
     output += `=== Current Stats ===\n`;
     output += `Total DPS: ${formatNumber(newStats.TotalDPS)}\n`;
@@ -150,6 +158,7 @@ export async function handleSetConfig(
       },
     ],
   };
+  });
 }
 
 /**
@@ -167,6 +176,7 @@ export async function handleSetEnemyStats(
     evasion?: number;
   }
 ) {
+  return wrapHandler('set enemy stats', async () => {
   await context.ensureLuaClient();
   const luaClient = context.getLuaClient();
   if (!luaClient) {
@@ -256,6 +266,7 @@ export async function handleSetEnemyStats(
       },
     ],
   };
+  });
 }
 
 /**

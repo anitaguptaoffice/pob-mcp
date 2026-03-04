@@ -1,6 +1,7 @@
 import type { WatchService } from "../services/watchService.js";
 import type { BuildService } from "../services/buildService.js";
 import type { TreeService } from "../services/treeService.js";
+import { wrapHandler } from "../utils/errorHandling.js";
 
 export interface WatchHandlerContext {
   watchService: WatchService;
@@ -33,27 +34,17 @@ export function handleStartWatching(context: WatchHandlerContext) {
 }
 
 export async function handleStopWatching(context: WatchHandlerContext) {
-  if (!context.watchService.isWatchEnabled()) {
+  return wrapHandler('stop watching', async () => {
+    if (!context.watchService.isWatchEnabled()) {
+      return {
+        content: [{ type: "text" as const, text: "File watching is not currently enabled." }],
+      };
+    }
+    await context.watchService.stopWatching();
     return {
-      content: [
-        {
-          type: "text" as const,
-          text: "File watching is not currently enabled.",
-        },
-      ],
+      content: [{ type: "text" as const, text: "File watching stopped." }],
     };
-  }
-
-  await context.watchService.stopWatching();
-
-  return {
-    content: [
-      {
-        type: "text" as const,
-        text: "File watching stopped.",
-      },
-    ],
-  };
+  });
 }
 
 export function handleGetRecentChanges(context: WatchHandlerContext, limit?: number) {
@@ -112,18 +103,17 @@ export function handleWatchStatus(context: WatchHandlerContext) {
 }
 
 export async function handleRefreshTreeData(context: WatchHandlerContext, version?: string) {
-  await context.treeService.refreshTreeData(version);
-
-  return {
-    content: [
-      {
+  return wrapHandler('refresh tree data', async () => {
+    await context.treeService.refreshTreeData(version);
+    return {
+      content: [{
         type: "text" as const,
         text: version
           ? `Passive tree data cache cleared for version ${version}.\n\nTree data will be re-fetched on next analysis.`
           : `All passive tree data caches cleared.\n\nTree data will be re-fetched on next analysis.`,
-      },
-    ],
-  };
+      }],
+    };
+  });
 }
 
 function formatTimeAgo(ms: number): string {

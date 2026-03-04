@@ -303,105 +303,135 @@ export async function handleCreateBudgetBuild(
       }
     }
 
-    let output = '=== Budget Build Guide ===\n\n';
-    output += `Build: ${buildName}\n`;
-    output += `Class: ${class_name}${ascendancy ? ` (${ascendancy})` : ''}\n`;
-    output += `Main Skill: ${main_skill}\n`;
-    output += `Budget Tier: ${budgetTier}\n\n`;
+    const outputLines: string[] = [
+      '=== Budget Build Guide ===',
+      '',
+      `Build: ${buildName}`,
+      `Class: ${class_name}${ascendancy ? ` (${ascendancy})` : ''}`,
+      `Main Skill: ${main_skill}`,
+      `Budget Tier: ${budgetTier}`,
+      '',
+      '=== Budget Guidelines ===',
+    ];
 
-    // Budget definitions
-    output += '=== Budget Guidelines ===\n';
     if (budget_level === 'low') {
-      output += '- Total budget: < 50 Chaos Orbs\n';
-      output += '- Use mostly self-found or vendor recipe items\n';
-      output += '- Focus on life/resistance capped gear first\n';
+      outputLines.push(
+        '- Total budget: < 50 Chaos Orbs',
+        '- Use mostly self-found or vendor recipe items',
+        '- Focus on life/resistance capped gear first'
+      );
     } else if (budget_level === 'medium') {
-      output += '- Total budget: 50-500 Chaos Orbs\n';
-      output += '- Can afford some build-enabling uniques\n';
-      output += '- Aim for 5-link main skill\n';
+      outputLines.push(
+        '- Total budget: 50-500 Chaos Orbs',
+        '- Can afford some build-enabling uniques',
+        '- Aim for 5-link main skill'
+      );
     } else {
-      output += '- Total budget: 500+ Chaos Orbs\n';
-      output += '- Access to most uniques and well-rolled rares\n';
-      output += '- 6-link possible\n';
+      outputLines.push(
+        '- Total budget: 500+ Chaos Orbs',
+        '- Access to most uniques and well-rolled rares',
+        '- 6-link possible'
+      );
     }
-    output += '\n';
+    outputLines.push('');
 
     // Skill setup recommendations
-    output += '=== Recommended Skill Links ===\n';
-    output += `Main Skill (${budget_level === 'high' ? '6' : budget_level === 'medium' ? '5' : '4'}-link):\n`;
-    output += `  1. ${main_skill}\n`;
-    output += '  2. [Damage Support - e.g., Added Fire, Elemental Damage with Attacks]\n';
-    output += '  3. [Multiplier Support - e.g., Multistrike, Spell Echo]\n';
-    output += '  4. [Utility Support - e.g., Faster Attacks, Inspiration]\n';
+    outputLines.push(
+      '=== Recommended Skill Links ===',
+      `Main Skill (${budget_level === 'high' ? '6' : budget_level === 'medium' ? '5' : '4'}-link):`,
+      `  1. ${main_skill}`,
+      '  2. [Damage Support - e.g., Added Fire, Elemental Damage with Attacks]',
+      '  3. [Multiplier Support - e.g., Multistrike, Spell Echo]',
+      '  4. [Utility Support - e.g., Faster Attacks, Inspiration]'
+    );
 
     if (budget_level !== 'low') {
-      output += '  5. [Penetration or More Damage - e.g., Fire Penetration, Elemental Focus]\n';
+      outputLines.push('  5. [Penetration or More Damage - e.g., Fire Penetration, Elemental Focus]');
     }
     if (budget_level === 'high') {
-      output += '  6. [Advanced Support - e.g., Awakened gems, Empower]\n';
+      outputLines.push('  6. [Advanced Support - e.g., Awakened gems, Empower]');
     }
-    output += '\n';
+    outputLines.push('');
 
     // Defensive layers
-    output += '=== Defensive Layers ===\n';
-    output += '- Aim for 75% all elemental resistances (MANDATORY)\n';
-    output += '- Target 4000+ life for softcore, 5000+ for hardcore\n';
-    output += '- Use defensive auras (Determination, Grace, or Defiance Banner)\n';
-    output += '- Get spell suppression if on right side of tree (Ranger/Shadow)\n';
-    output += '- Consider block/evasion/armour based on class\n';
-    output += '\n';
+    outputLines.push(
+      '=== Defensive Layers ===',
+      '- Aim for 75% all elemental resistances (MANDATORY)',
+      '- Target 4000+ life for softcore, 5000+ for hardcore',
+      '- Use defensive auras (Determination, Grace, or Defiance Banner)',
+      '- Get spell suppression if on right side of tree (Ranger/Shadow)',
+      '- Consider block/evasion/armour based on class',
+      ''
+    );
 
     // Gearing strategy
-    output += '=== Budget Gearing Strategy ===\n';
-    output += '**Weapons:**\n';
+    outputLines.push('=== Budget Gearing Strategy ===', '**Weapons:**');
     if (budget_level === 'low') {
-      output += '  - Use vendor recipes or essence crafting\n';
-      output += '  - For spells: +1 to gems wands/sceptres\n';
-      output += '  - For attacks: high physical DPS rares\n';
+      outputLines.push(
+        '  - Use vendor recipes or essence crafting',
+        '  - For spells: +1 to gems wands/sceptres',
+        '  - For attacks: high physical DPS rares'
+      );
     } else {
-      output += '  - Budget uniques that enable the build\n';
-      output += '  - Well-rolled rare weapons with good DPS\n';
+      outputLines.push(
+        '  - Budget uniques that enable the build',
+        '  - Well-rolled rare weapons with good DPS'
+      );
     }
-    output += '\n**Armor:**\n';
+    outputLines.push('**Armor:**');
     if (budget_level === 'low') {
-      output += '  - Prioritize life and resistances\n';
-      output += '  - Use essences for guaranteed mods\n';
-      output += '  - Tabula Rasa for temporary 6-link (1 chaos)\n';
+      outputLines.push(
+        '  - Prioritize life and resistances',
+        '  - Use essences for guaranteed mods',
+        '  - Tabula Rasa for temporary 6-link (1 chaos)'
+      );
     } else {
-      output += '  - Build-enabling chest uniques if applicable\n';
-      output += '  - Aim for 5-6 link rare with life and resistances\n';
+      outputLines.push(
+        '  - Build-enabling chest uniques if applicable',
+        '  - Aim for 5-6 link rare with life and resistances'
+      );
     }
-    output += '\n**Accessories:**\n';
-    output += '  - Fill in missing resistances\n';
-    output += '  - Add damage stats where possible\n';
-    output += '  - Get unique ring/amulet if budget allows\n';
-    output += '\n';
+    outputLines.push(
+      '**Accessories:**',
+      '  - Fill in missing resistances',
+      '  - Add damage stats where possible',
+      '  - Get unique ring/amulet if budget allows',
+      ''
+    );
 
     // Passive tree guidance
-    output += '=== Passive Tree Priorities ===\n';
-    output += '1. Path to key damage clusters for your skill\n';
-    output += '2. Grab life/ES nodes along the way\n';
-    output += '3. Get important keystones for your build\n';
-    output += '4. Fill in jewel sockets if you have good jewels\n';
-    output += '\nUse the `suggest_optimal_nodes` or `get_passive_upgrades` tools for specific recommendations!\n';
-    output += '\n';
+    outputLines.push(
+      '=== Passive Tree Priorities ===',
+      '1. Path to key damage clusters for your skill',
+      '2. Grab life/ES nodes along the way',
+      '3. Get important keystones for your build',
+      '4. Fill in jewel sockets if you have good jewels',
+      '',
+      'Use the `suggest_optimal_nodes` or `get_passive_upgrades` tools for specific recommendations!',
+      ''
+    );
 
     // Leveling tips
-    output += '=== Leveling Tips ===\n';
-    output += `- Level with ${main_skill} or a similar skill if available early\n`;
-    output += '- Use vendor recipe weapons (magic/rare rustic sash + weapon + whetstone)\n';
-    output += '- Grab life nodes while leveling, respec for damage later if needed\n';
-    output += '- Get movement speed boots ASAP\n';
-    output += '- Don\'t worry about resistances until Act 5+\n';
-    output += '\n';
+    outputLines.push(
+      '=== Leveling Tips ===',
+      `- Level with ${main_skill} or a similar skill if available early`,
+      '- Use vendor recipe weapons (magic/rare rustic sash + weapon + whetstone)',
+      '- Grab life nodes while leveling, respec for damage later if needed',
+      '- Get movement speed boots ASAP',
+      "- Don't worry about resistances until Act 5+",
+      ''
+    );
 
     // Next steps
-    output += '=== Next Steps ===\n';
-    output += '1. Use `lua_new_build` to create a new build with this class\n';
-    output += '2. Use `setup_skill_with_gems` to configure your main skill\n';
-    output += '3. Use `suggest_optimal_nodes` to get passive tree recommendations\n';
-    output += '4. Use `add_item` or `add_multiple_items` to equip budget gear\n';
-    output += '5. Use `analyze_defenses` to check for defensive gaps\n';
+    outputLines.push(
+      '=== Next Steps ===',
+      '1. Use `lua_new_build` to create a new build with this class',
+      '2. Use `setup_skill_with_gems` to configure your main skill',
+      '3. Use `suggest_optimal_nodes` to get passive tree recommendations',
+      '4. Use `add_item` or `add_multiple_items` to equip budget gear',
+      '5. Use `analyze_defenses` to check for defensive gaps'
+    );
+    const output = outputLines.join('\n');
 
     return {
       content: [

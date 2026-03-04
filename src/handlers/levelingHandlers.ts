@@ -7,6 +7,7 @@
  */
 
 import type { PoBLuaApiClient } from "../pobLuaBridge.js";
+import { wrapHandler } from "../utils/errorHandling.js";
 
 export interface LevelingContext {
   getLuaClient: () => PoBLuaApiClient | null;
@@ -48,6 +49,7 @@ export async function handlePlanLeveling(
     ascendancy?: string;
   }
 ) {
+  return wrapHandler('plan leveling', async () => {
   let className = args.class_name;
   let mainSkill = args.main_skill;
   let ascendancy = args.ascendancy;
@@ -142,4 +144,5 @@ export async function handlePlanLeveling(
   output += `_Use \`get_passive_upgrades\` with a loaded build for specific node recommendations._\n`;
 
   return { content: [{ type: 'text' as const, text: output }] };
+  });
 }
