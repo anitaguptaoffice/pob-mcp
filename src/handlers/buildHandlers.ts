@@ -34,12 +34,14 @@ export async function handleAnalyzeBuild(context: HandlerContext, buildName: str
   let luaStats: any = null;
   let luaSkipped = false;
   let luaActiveSpecIndex: number | null = null;
+  let luaActiveItemSetId: string | null = null;
   const specContextLines: string[] = [];
   try {
     await context.ensureLuaClient();
     const luaClient = context.getLuaClient();
 
     if (luaClient) {
+      const basename = (n: string) => n.split(/[/\\]/).pop() ?? n;
       let shouldLoad = true;
       try {
         const info = await luaClient.getBuildInfo();
@@ -48,7 +50,9 @@ export async function handleAnalyzeBuild(context: HandlerContext, buildName: str
         const requested = buildName.replace(/\.xml$/i, '');
         const loaded    = loadedName.replace(/\.xml$/i, '');
         if (loaded) {
-          if (loaded !== requested) {
+          const sameExact = loaded === requested;
+          const sameBase  = basename(loaded) === basename(requested);
+          if (!sameExact && !sameBase) {
             // A different build is in memory — skip loading to avoid destroying unsaved work
             shouldLoad = false;
             luaSkipped = true;
@@ -73,6 +77,7 @@ export async function handleAnalyzeBuild(context: HandlerContext, buildName: str
         const activeSpec = specsResult?.specs?.find((s: any) => s.active);
         const activeItemSet = itemSetsResult?.itemSets?.find((s: any) => s.active);
         if (activeSpec) luaActiveSpecIndex = activeSpec.index;
+        if (activeItemSet) luaActiveItemSetId = String(activeItemSet.id);
         const numSpecs = specsResult?.specs?.length ?? 0;
         const numSets = itemSetsResult?.itemSets?.length ?? 0;
         if (numSpecs > 1 || numSets > 1) {
@@ -94,7 +99,22 @@ export async function handleAnalyzeBuild(context: HandlerContext, buildName: str
     // Continue with XML-only analysis
   }
 
-  const summaryParts: string[] = [context.buildService.generateBuildSummary(build)];
+  // Build an override object that reflects the Lua-selected spec/item set/skill set,
+  // so generateBuildSummary and analyzePassiveTree read from the correct sets (not disk defaults).
+  const buildForAnalysis: typeof build = {
+    ...build,
+    ...(luaActiveSpecIndex !== null && build.Tree
+      ? { Tree: { ...build.Tree, activeSpec: String(luaActiveSpecIndex) } }
+      : {}),
+    ...(luaActiveItemSetId !== null && build.Items
+      ? { Items: { ...(build.Items as any), activeItemSet: luaActiveItemSetId } }
+      : {}),
+    ...(luaActiveItemSetId !== null && build.Skills
+      ? { Skills: { ...(build.Skills as any), activeSkillSet: luaActiveItemSetId } }
+      : {}),
+  };
+
+  const summaryParts: string[] = [context.buildService.generateBuildSummary(buildForAnalysis)];
 
   if (luaSkipped) {
     summaryParts.push(
@@ -155,12 +175,9 @@ export async function handleAnalyzeBuild(context: HandlerContext, buildName: str
     summaryParts.push(`\n=== Jewel Setup ===\n\nJewel parsing error: ${errorMsg}`);
   }
 
-  // Add tree analysis — use Lua's active spec index if available (overrides XML default)
+  // Add tree analysis — buildForAnalysis already has the Lua-selected spec overridden
   try {
-    const buildForTree = (luaActiveSpecIndex !== null && build.Tree)
-      ? { ...build, Tree: { ...build.Tree, activeSpec: String(luaActiveSpecIndex) } }
-      : build;
-    const treeAnalysis = await context.treeService.analyzePassiveTree(buildForTree);
+    const treeAnalysis = await context.treeService.analyzePassiveTree(buildForAnalysis);
     if (treeAnalysis) {
       summaryParts.push(formatTreeAnalysis(treeAnalysis));
     } else {

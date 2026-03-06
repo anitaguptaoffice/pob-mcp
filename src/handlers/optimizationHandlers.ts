@@ -34,11 +34,13 @@ export async function handleAnalyzeDefenses(
     // Only reload from disk if a different build (or no build) is currently loaded.
     // If the same build is already loaded, preserve the current spec/item set selection.
     const requested = buildName.replace(/\.xml$/i, '');
+    const basename = (n: string) => n.split(/[/\\]/).pop() ?? n;
     let needsLoad = true;
     try {
       const info = await luaClient.getBuildInfo();
       const loaded = (info?.name ?? '').replace(/\.xml$/i, '');
-      if (loaded && loaded === requested) {
+      // Accept exact match OR basename match (handles path prefix differences)
+      if (loaded && (loaded === requested || basename(loaded) === basename(requested))) {
         needsLoad = false; // same build — keep current Lua state
       }
     } catch { /* no build loaded yet */ }

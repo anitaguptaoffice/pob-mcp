@@ -36,13 +36,25 @@ export async function handleAnalyzeItems(
     const luaClient = context.getLuaClient();
 
     if (luaClient) {
-      // Load build into Lua if buildName provided, otherwise use currently loaded build
+      // Load build into Lua only if a different build (or no build) is currently loaded.
+      // Preserves any select_spec / select_item_set changes made in the current session.
       if (buildName) {
         const fs = await import('fs/promises');
         const path = await import('path');
-        const buildPath = path.join(context.pobDirectory, buildName);
-        const xml = await fs.readFile(buildPath, 'utf-8');
-        await luaClient.loadBuildXml(xml, buildName);
+        let needsLoad = true;
+        try {
+          const info = await luaClient.getBuildInfo();
+          const loaded = (info?.name ?? '').replace(/\.xml$/i, '');
+          const requested = buildName.replace(/\.xml$/i, '');
+          if (loaded && (loaded === requested || loaded.split(/[/\\]/).pop() === requested.split(/[/\\]/).pop())) {
+            needsLoad = false;
+          }
+        } catch { /* no build loaded yet */ }
+        if (needsLoad) {
+          const buildPath = path.join(context.pobDirectory, buildName);
+          const xml = await fs.readFile(buildPath, 'utf-8');
+          await luaClient.loadBuildXml(xml, buildName);
+        }
       }
 
       try {
