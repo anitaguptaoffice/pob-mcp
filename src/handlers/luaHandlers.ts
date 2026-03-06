@@ -130,8 +130,16 @@ export async function handleLuaLoadBuild(
       if (specsResult?.specs?.length > 1) {
         extraLines.push('');
         extraLines.push(`📋 This build has ${specsResult.specs.length} passive tree specs:`);
+        const maxNodes = Math.max(...specsResult.specs.map((s: any) => s.nodeCount ?? 0));
         for (const s of specsResult.specs) {
-          extraLines.push(`  ${s.active ? '▶' : ' '} [${s.index}] ${s.title} — ${s.className}/${s.ascendClassName}, ${s.nodeCount} nodes`);
+          const isEndgame = s.nodeCount === maxNodes && !s.active ? ' ← likely endgame' : '';
+          extraLines.push(`  ${s.active ? '▶' : ' '} [${s.index}] ${s.title} — ${s.className}/${s.ascendClassName}, ${s.nodeCount} nodes${isEndgame}`);
+        }
+        // Warn if active spec is not the one with the most nodes
+        const activeSpec = specsResult.specs.find((s: any) => s.active);
+        if (activeSpec && activeSpec.nodeCount < maxNodes) {
+          const endgameSpec = specsResult.specs.find((s: any) => s.nodeCount === maxNodes);
+          extraLines.push(`⚠️  Active spec is a leveling tree (${activeSpec.nodeCount} nodes). For endgame analysis, run: select_spec(${endgameSpec?.index})`);
         }
         extraLines.push('Use select_spec to switch specs.');
       }

@@ -100,21 +100,27 @@ export class BuildService {
       }
     }
 
-    // Skills
-    if (build.Skills?.SkillSet?.Skill) {
-      summary += "=== Skills ===\n";
-      const skills = Array.isArray(build.Skills.SkillSet.Skill)
-        ? build.Skills.SkillSet.Skill
-        : [build.Skills.SkillSet.Skill];
-
-      for (const skill of skills) {
-        if (skill.Gem) {
-          const gems = Array.isArray(skill.Gem) ? skill.Gem : [skill.Gem];
-          summary += gems.map(g => `${g.nameSpec || g.name || 'Unknown'} (${g.level}/${g.quality})`).join(" - ");
-          summary += "\n";
+    // Skills — handle single SkillSet or array of SkillSets
+    {
+      const skillSetRaw = build.Skills?.SkillSet;
+      const skillSets: any[] = skillSetRaw
+        ? (Array.isArray(skillSetRaw) ? skillSetRaw : [skillSetRaw])
+        : [];
+      const activeSkillSetId = String((build.Skills as any)?.activeSkillSet ?? '1');
+      const activeSkillSet = skillSets.find((ss: any) => String(ss.id) === activeSkillSetId) ?? skillSets[0];
+      if (activeSkillSet?.Skill) {
+        const setLabel = skillSets.length > 1 ? ` (Set ${activeSkillSetId} of ${skillSets.length})` : '';
+        summary += `=== Skills${setLabel} ===\n`;
+        const skills = Array.isArray(activeSkillSet.Skill) ? activeSkillSet.Skill : [activeSkillSet.Skill];
+        for (const skill of skills) {
+          if (skill.Gem) {
+            const gems = Array.isArray(skill.Gem) ? skill.Gem : [skill.Gem];
+            summary += gems.map((g: any) => `${g.nameSpec || g.name || 'Unknown'} (${g.level}/${g.quality})`).join(" - ");
+            summary += "\n";
+          }
         }
+        summary += "\n";
       }
-      summary += "\n";
     }
 
     // Items — build an id→text map from the Item array, then render by slot
@@ -129,15 +135,22 @@ export class BuildService {
         }
       }
 
-      const slots = build.Items.ItemSet?.Slot
-        ? (Array.isArray(build.Items.ItemSet.Slot)
-            ? build.Items.ItemSet.Slot
-            : [build.Items.ItemSet.Slot])
+      // Handle single ItemSet or array of ItemSets
+      const itemSetRaw = build.Items.ItemSet;
+      const itemSets: any[] = itemSetRaw
+        ? (Array.isArray(itemSetRaw) ? itemSetRaw : [itemSetRaw])
+        : [];
+      const activeItemSetId = String((build.Items as any)?.activeItemSet ?? '1');
+      const activeItemSet = itemSets.find((is: any) => String(is.id) === activeItemSetId) ?? itemSets[0];
+
+      const slots: any[] = activeItemSet?.Slot
+        ? (Array.isArray(activeItemSet.Slot) ? activeItemSet.Slot : [activeItemSet.Slot])
         : [];
 
-      const equippedSlots = slots.filter(s => s.itemId && itemMap.has(s.itemId));
+      const equippedSlots = slots.filter((s: any) => s.itemId && itemMap.has(s.itemId));
       if (equippedSlots.length > 0) {
-        summary += "=== Items ===\n";
+        const setLabel = itemSets.length > 1 ? ` (Set ${activeItemSetId} of ${itemSets.length})` : '';
+        summary += `=== Items${setLabel} ===\n`;
         for (const slot of equippedSlots) {
           const text = itemMap.get(slot.itemId!)!;
           const firstLine = text.split("\n").find(l => l.trim()) || "Unknown Item";

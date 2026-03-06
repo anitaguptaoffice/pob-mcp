@@ -31,11 +31,23 @@ export async function handleAnalyzeDefenses(
       throw new Error('Lua client not initialized.');
     }
 
-    // Load the build into the Lua bridge
-    const buildPath = path.join(context.pobDirectory, buildName);
-    const buildXml = await fs.readFile(buildPath, 'utf-8');
+    // Only reload from disk if a different build (or no build) is currently loaded.
+    // If the same build is already loaded, preserve the current spec/item set selection.
+    const requested = buildName.replace(/\.xml$/i, '');
+    let needsLoad = true;
+    try {
+      const info = await luaClient.getBuildInfo();
+      const loaded = (info?.name ?? '').replace(/\.xml$/i, '');
+      if (loaded && loaded === requested) {
+        needsLoad = false; // same build — keep current Lua state
+      }
+    } catch { /* no build loaded yet */ }
 
-    await luaClient.loadBuildXml(buildXml, 'Defense Analysis');
+    if (needsLoad) {
+      const buildPath = path.join(context.pobDirectory, buildName);
+      const buildXml = await fs.readFile(buildPath, 'utf-8');
+      await luaClient.loadBuildXml(buildXml, buildName);
+    }
 
     // Get stats from PoB
     const stats = await luaClient.getStats();
@@ -48,10 +60,29 @@ export async function handleAnalyzeDefenses(
       );
     }
 
+    // Collect active spec / item set context for the header
+    let contextHeader = `Analyzing: ${buildName}`;
+    try {
+      const specsResult = await luaClient.listSpecs();
+      const itemSetsResult = await luaClient.listItemSets();
+      const activeSpec = specsResult?.specs?.find((s: any) => s.active);
+      const activeItemSet = itemSetsResult?.itemSets?.find((s: any) => s.active);
+      const parts: string[] = [];
+      if (activeSpec && specsResult?.specs?.length > 1) {
+        parts.push(`Spec ${activeSpec.index}/${specsResult.specs.length}: "${activeSpec.title}" (${activeSpec.nodeCount} nodes)`);
+      }
+      if (activeItemSet && itemSetsResult?.itemSets?.length > 1) {
+        parts.push(`Item Set ${activeItemSet.id}/${itemSetsResult.itemSets.length}: "${activeItemSet.title}"`);
+      }
+      if (parts.length > 0) {
+        contextHeader += `\n[${parts.join(' | ')}]`;
+      }
+    } catch { /* advisory only */ }
+
     // Analyze defenses
     const analysis = analyzeDefenses(stats);
 
-    let text = `Analyzing: ${buildName}\n\n`;
+    let text = `${contextHeader}\n\n`;
     text += formatDefensiveAnalysis(analysis);
 
     return {

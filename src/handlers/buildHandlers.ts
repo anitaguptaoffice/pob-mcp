@@ -28,10 +28,13 @@ export async function handleAnalyzeBuild(context: HandlerContext, buildName: str
   return wrapHandler('analyze build', async () => {
   const build = await context.buildService.readBuild(buildName);
 
-  // Try to get live Lua stats — only load from file if the same build is already loaded
-  // or if no build is loaded. Never replace a *different* in-memory build (data-loss risk).
+  // Try to get live Lua stats — only load from file if no build is loaded.
+  // If the same build is already loaded, preserve current spec/item set selection.
+  // Never replace a *different* in-memory build (data-loss risk).
   let luaStats: any = null;
   let luaSkipped = false;
+  let luaActiveSpecIndex: number | null = null;
+  const specContextLines: string[] = [];
   try {
     await context.ensureLuaClient();
     const luaClient = context.getLuaClient();
@@ -44,10 +47,15 @@ export async function handleAnalyzeBuild(context: HandlerContext, buildName: str
         // Strip .xml suffix for comparison since PoB may omit it
         const requested = buildName.replace(/\.xml$/i, '');
         const loaded    = loadedName.replace(/\.xml$/i, '');
-        if (loaded && loaded !== requested) {
-          // A different build is in memory — skip loading to avoid destroying unsaved work
-          shouldLoad = false;
-          luaSkipped = true;
+        if (loaded) {
+          if (loaded !== requested) {
+            // A different build is in memory — skip loading to avoid destroying unsaved work
+            shouldLoad = false;
+            luaSkipped = true;
+          } else {
+            // Same build already loaded — preserve current spec/item set selection
+            shouldLoad = false;
+          }
         }
       } catch { /* no build loaded yet — safe to load */ }
 
@@ -55,11 +63,32 @@ export async function handleAnalyzeBuild(context: HandlerContext, buildName: str
         const buildPath = path.join(context.pobDirectory, buildName);
         const buildXml = await fs.readFile(buildPath, 'utf-8');
         await luaClient.loadBuildXml(buildXml);
-        luaStats = await luaClient.getStats();
-      } else {
-        // Still try to get stats from the currently-loaded build for reference
-        try { luaStats = await luaClient.getStats(); } catch { /* best effort */ }
       }
+      try { luaStats = await luaClient.getStats(); } catch { /* best effort */ }
+
+      // Query active spec/item set for context and to guide tree analysis
+      try {
+        const specsResult = await luaClient.listSpecs();
+        const itemSetsResult = await luaClient.listItemSets();
+        const activeSpec = specsResult?.specs?.find((s: any) => s.active);
+        const activeItemSet = itemSetsResult?.itemSets?.find((s: any) => s.active);
+        if (activeSpec) luaActiveSpecIndex = activeSpec.index;
+        const numSpecs = specsResult?.specs?.length ?? 0;
+        const numSets = itemSetsResult?.itemSets?.length ?? 0;
+        if (numSpecs > 1 || numSets > 1) {
+          const parts: string[] = [];
+          if (activeSpec && numSpecs > 1) {
+            parts.push(`Spec ${activeSpec.index}/${numSpecs}: "${activeSpec.title}" (${activeSpec.nodeCount} nodes)`);
+          }
+          if (activeItemSet && numSets > 1) {
+            parts.push(`Item Set ${activeItemSet.id}/${numSets}: "${activeItemSet.title}"`);
+          }
+          if (parts.length > 0) {
+            specContextLines.push(`[Analyzing: ${parts.join(' | ')}]`);
+            specContextLines.push('Use select_spec / select_item_set to switch before re-analyzing.');
+          }
+        }
+      } catch { /* advisory only */ }
     }
   } catch (error) {
     // Continue with XML-only analysis
@@ -72,6 +101,11 @@ export async function handleAnalyzeBuild(context: HandlerContext, buildName: str
       "\n⚠️  Note: A different build is loaded in the Lua bridge. Stats shown are from that build.\n" +
       "    Use lua_load_build to load this build for accurate live stats."
     );
+  }
+
+  // Show active spec/item set context when multiple exist
+  if (specContextLines.length > 0) {
+    summaryParts.push('\n' + specContextLines.join('\n'));
   }
 
   // If we have Lua stats, add them
@@ -121,9 +155,12 @@ export async function handleAnalyzeBuild(context: HandlerContext, buildName: str
     summaryParts.push(`\n=== Jewel Setup ===\n\nJewel parsing error: ${errorMsg}`);
   }
 
-  // Add tree analysis
+  // Add tree analysis — use Lua's active spec index if available (overrides XML default)
   try {
-    const treeAnalysis = await context.treeService.analyzePassiveTree(build);
+    const buildForTree = (luaActiveSpecIndex !== null && build.Tree)
+      ? { ...build, Tree: { ...build.Tree, activeSpec: String(luaActiveSpecIndex) } }
+      : build;
+    const treeAnalysis = await context.treeService.analyzePassiveTree(buildForTree);
     if (treeAnalysis) {
       summaryParts.push(formatTreeAnalysis(treeAnalysis));
     } else {
