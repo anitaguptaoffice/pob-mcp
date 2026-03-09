@@ -6,7 +6,6 @@ import { wrapHandler } from '../utils/errorHandling.js';
 export interface CraftingAdvisorContext {
   getLuaClient: () => PoBLuaApiClient | null;
   ninjaClient: PoeNinjaClient;
-  pobDirectory: string;
 }
 
 export interface CraftingResponseInput {
@@ -16,6 +15,8 @@ export interface CraftingResponseInput {
   modData: string;
   currencyRates: { chaos: number; divine: number };
   buildContext: Record<string, any> | null;
+  ilvl?: number;
+  budget?: 'low' | 'medium' | 'high';
 }
 
 const CRAFTING_METHODS = `
@@ -47,6 +48,13 @@ export function buildCraftingResponse(input: CraftingResponseInput): string {
     text += `(No specific mods requested — use build context below)\n`;
   }
   text += '\n';
+
+  if (input.ilvl !== undefined || input.budget !== undefined) {
+    text += `## Crafting Parameters\n`;
+    if (input.ilvl !== undefined) text += `- Item Level: ${input.ilvl} (affects reachable mod tiers)\n`;
+    if (input.budget !== undefined) text += `- Budget: ${input.budget}\n`;
+    text += '\n';
+  }
 
   if (buildContext) {
     text += `## Build context\n`;
@@ -155,6 +163,8 @@ export async function handleSuggestCrafting(
       modData,
       currencyRates,
       buildContext,
+      ilvl: args.ilvl,
+      budget: args.budget,
     });
 
     return {
