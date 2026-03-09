@@ -1,5 +1,5 @@
-import { describe, it, expect } from '@jest/globals';
-import { formatBaseSlug, parsePoedbText } from '../../src/services/craftingDataService';
+import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
+import { formatBaseSlug, parsePoedbText, fetchBaseModData } from '../../src/services/craftingDataService';
 
 describe('formatBaseSlug', () => {
   it('replaces spaces with underscores', () => {
@@ -16,7 +16,7 @@ describe('formatBaseSlug', () => {
 });
 
 describe('parsePoedbText', () => {
-  it('extracts fossil section when present', () => {
+  it('includes text content from HTML body', () => {
     const html = '<h2>Fossil</h2><p>Aberrant Fossil - removes lightning mods</p>';
     const result = parsePoedbText(html, 'Hubris Circlet');
     expect(result).toContain('Aberrant');
@@ -25,5 +25,44 @@ describe('parsePoedbText', () => {
   it('returns base name in output', () => {
     const result = parsePoedbText('<html>some content</html>', 'Hubris Circlet');
     expect(result).toContain('Hubris Circlet');
+  });
+});
+
+describe('fetchBaseModData', () => {
+  let fetchSpy: any;
+
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(global, 'fetch' as any);
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it('returns CraftingBaseData on success', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      text: async () => '<html><body>some mod data</body></html>',
+    } as any);
+
+    const result = await fetchBaseModData('Hubris Circlet');
+    expect(result.base).toBe('Hubris Circlet');
+    expect(result.poedbUrl).toContain('Hubris_Circlet');
+    expect(result.modText).toContain('Hubris Circlet');
+  });
+
+  it('throws on non-OK response', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 404,
+    } as any);
+
+    await expect(fetchBaseModData('Fake Base')).rejects.toThrow('404');
+  });
+
+  it('throws with context on network error', async () => {
+    fetchSpy.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await expect(fetchBaseModData('Hubris Circlet')).rejects.toThrow('poedb network error for "Hubris Circlet"');
   });
 });

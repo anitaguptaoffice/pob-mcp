@@ -28,12 +28,18 @@ export async function fetchBaseModData(base: string): Promise<CraftingBaseData> 
   const slug = formatBaseSlug(base);
   const url = `https://poedb.tw/us/${encodeURIComponent(slug)}`;
 
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'pob-mcp-server/1.0 (crafting advisor)',
-    },
-    signal: AbortSignal.timeout(10000),
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        'User-Agent': 'pob-mcp-server/1.0 (crafting advisor)',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (err) {
+    const cause = err instanceof Error ? err.message : String(err);
+    throw new Error(`poedb network error for "${base}": ${cause}`);
+  }
 
   if (!response.ok) {
     throw new Error(`poedb fetch failed for "${base}": ${response.status}`);
