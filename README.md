@@ -460,6 +460,11 @@ PoB builds are XML files with:
 
 Issues and pull requests are welcome!
 
+## Contributors
+
+<!-- readme: collaborators,contributors -start -->
+<!-- readme: collaborators,contributors -end -->
+
 ## License
 
 MIT
