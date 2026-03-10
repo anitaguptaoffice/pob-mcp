@@ -3,3 +3,6 @@ build/
 *.log
 .DS_Store
 .env
+settings.local.json
+jest-output.json
+coverage/

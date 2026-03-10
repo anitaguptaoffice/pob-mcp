@@ -11,6 +11,7 @@ import {
   formatSkillOptimization,
   type SkillGroup,
 } from "../skillLinkOptimizer.js";
+import { sanitizeBuildName } from "../utils/pathSanitizer.js";
 
 export interface AdvancedOptimizationContext {
   buildService: BuildService;
@@ -51,7 +52,7 @@ export async function handleAnalyzeItems(
           }
         } catch { /* no build loaded yet */ }
         if (needsLoad) {
-          const buildPath = path.join(context.pobDirectory, buildName);
+          const buildPath = sanitizeBuildName(buildName, context.pobDirectory);
           const xml = await fs.readFile(buildPath, 'utf-8');
           await luaClient.loadBuildXml(xml, buildName);
         }
