@@ -487,4 +487,4 @@ Issues and pull requests are welcome!
 
 ## License
 
-MIT
+GPL-3.0
