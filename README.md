@@ -467,6 +467,13 @@ Issues and pull requests are welcome!
 	<tbody>
 		<tr>
             <td align="center">
+                <a href="https://github.com/anitaguptaoffice">
+                    <img src="https://avatars.githubusercontent.com/u/188018831?v=4" width="100;" alt="anitaguptaoffice"/>
+                    <br />
+                    <sub><b>Ranjan Shukla</b></sub>
+                </a>
+            </td>
+            <td align="center">
                 <a href="https://github.com/ianderse">
                     <img src="https://avatars.githubusercontent.com/u/5242189?v=4" width="100;" alt="ianderse"/>
                     <br />
