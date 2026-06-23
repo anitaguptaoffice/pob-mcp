@@ -197,10 +197,36 @@ describe('PoBLuaApiClient', () => {
       const tree = await client.getTree();
 
       expect(tree).toHaveProperty('treeVersion');
+      expect(tree).toHaveProperty('className');
       expect(tree).toHaveProperty('classId');
+      expect(tree).toHaveProperty('ascendClassName');
       expect(tree).toHaveProperty('ascendClassId');
       expect(tree).toHaveProperty('nodes');
       expect(tree).toHaveProperty('masteryEffects');
+    });
+
+    it('should preserve alternate ascendancy names from Lua', async () => {
+      mockProcess.registerResponse('get_tree', {
+        ok: true,
+        tree: {
+          treeVersion: '3_28_alternate',
+          className: 'Marauder',
+          classId: 1,
+          ascendClassName: 'Ancestral Commander',
+          ascendClassId: 1,
+          secondaryAscendClassName: 'Chaos Bloodline',
+          secondaryAscendClassId: 14,
+          nodes: [1, 2, 3],
+          masteryEffects: {},
+        },
+      });
+
+      const tree = await client.getTree();
+
+      expect(tree.treeVersion).toBe('3_28_alternate');
+      expect(tree.className).toBe('Marauder');
+      expect(tree.ascendClassName).toBe('Ancestral Commander');
+      expect(tree.secondaryAscendClassName).toBe('Chaos Bloodline');
     });
   });
 

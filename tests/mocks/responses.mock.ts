@@ -29,7 +29,9 @@ export const MOCK_RESPONSES = {
     ok: true,
     tree: {
       treeVersion: '3_28',
+      className: 'Ranger',
       classId: 2,
+      ascendClassName: 'Raider',
       ascendClassId: 1,
       secondaryAscendClassId: 0,
       nodes: [1, 2, 3, 4, 5, 26725, 36858],
@@ -65,7 +67,7 @@ export const MOCK_RESPONSES = {
   },
   add_item_text: {
     ok: true,
-    result: {
+    item: {
       id: 123,
       name: 'Steel Blade',
       slot: 'Weapon 1',
@@ -74,7 +76,7 @@ export const MOCK_RESPONSES = {
   set_flask_active: { ok: true },
   get_skills: {
     ok: true,
-    result: {
+    skills: {
       mainSocketGroup: 1,
       calcsSkillNumber: 1,
       groups: [

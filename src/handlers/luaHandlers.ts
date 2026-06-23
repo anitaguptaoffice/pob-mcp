@@ -356,14 +356,15 @@ export async function handleLuaGetTree(context: LuaHandlerContext, includeNodeId
     if (tree && typeof tree === 'object') {
       textLines.push(`Tree Version: ${tree.treeVersion ?? 'Unknown'}`);
       const classId = tree.classId != null ? tree.classId : undefined;
-      const className = classId != null ? CLASS_NAMES[classId] : undefined;
+      const className = tree.className || (classId != null ? CLASS_NAMES[classId] : undefined);
       textLines.push(`Class: ${className ?? 'Unknown'} (ID: ${classId ?? 'Unknown'})`);
       const ascId = tree.ascendClassId != null ? tree.ascendClassId : undefined;
-      const ascName = classId != null && ascId != null && ascId > 0 ? ASCENDANCY_NAMES[classId]?.[ascId] : (ascId === 0 ? 'None' : undefined);
+      const ascName = tree.ascendClassName || (classId != null && ascId != null && ascId > 0 ? ASCENDANCY_NAMES[classId]?.[ascId] : (ascId === 0 ? 'None' : undefined));
       textLines.push(`Ascendancy: ${ascName ?? 'Unknown'} (ID: ${ascId ?? 'Unknown'})`);
 
       if (tree.secondaryAscendClassId) {
-        textLines.push(`Secondary Ascendancy ID: ${tree.secondaryAscendClassId}`);
+        const secondaryName = tree.secondaryAscendClassName ? `${tree.secondaryAscendClassName} ` : '';
+        textLines.push(`Secondary Ascendancy: ${secondaryName}(ID: ${tree.secondaryAscendClassId})`);
       }
 
       if (tree.nodes && Array.isArray(tree.nodes)) {
